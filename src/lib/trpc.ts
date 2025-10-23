@@ -44,8 +44,8 @@ interface MockUser {
 let mockUsers: MockUser[] = [
   {
     id: 'user-1',
-    name: 'Admin User',
-    email: 'admin@example.com',
+    name: 'Phuong Admin',
+    email: 'phuonglh43@gmail.com',
     passwordHash: 'password123', // For demo purposes, not secure
     role: 'admin',
     status: 'active',

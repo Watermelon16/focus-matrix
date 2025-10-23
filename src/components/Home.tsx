@@ -7,12 +7,11 @@ import { EisenhowerMatrix } from "./EisenhowerMatrix";
 import { AddTaskDialog } from "./AddTaskDialog";
 import { IcsImporter } from "./IcsImporter";
 import { UserProfile } from "./UserProfile";
-import { TeamSettings } from "./TeamSettings";
 import { SmartDashboard } from "./SmartDashboard";
 import { EditReminderDialog } from "./EditReminderDialog";
 import { LoginDialog } from "./LoginDialog";
 import { AdminDashboard } from "./AdminDashboard";
-import { Loader2, LogOut, Trash2, BarChart3, Grid3X3, Users, FileText, RotateCcw } from "lucide-react";
+import { Loader2, LogOut, Trash2, BarChart3, Grid3X3, Users, RotateCcw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { getNow } from "@/lib/date";
 import { useEffect, useState } from "react";
@@ -149,17 +148,20 @@ export default function Home() {
                       <BarChart3 className="mr-2 h-4 w-4" />
                       Dashboard
                     </Button>
-                    <Button
-                      variant={view === 'admin' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setView('admin')}
-                    >
-                      <Users className="mr-2 h-4 w-4" />
-                      Quản trị
-                    </Button>
+                    {/* Chỉ hiển thị cho admin phuonglh43@gmail.com */}
+                    {user?.email === 'phuonglh43@gmail.com' && (
+                      <Button
+                        variant={view === 'admin' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setView('admin')}
+                      >
+                        <Users className="mr-2 h-4 w-4" />
+                        Quản trị
+                      </Button>
+                    )}
             <UserProfile onRefresh={forceRefresh} />
-            {/* Team settings - requires Google access token, for demo we render button and ask for login first */}
-            <TeamSettings accessToken={(window as any).__googleAccessToken || ''} />
+            {/* Team settings - temporarily hidden */}
+            {/* <TeamSettings accessToken={(window as any).__googleAccessToken || ''} /> */}
             <Button variant="outline" onClick={() => logout()}>
               <LogOut className="mr-2 h-4 w-4" />
               Đăng xuất
@@ -169,39 +171,6 @@ export default function Home() {
       </header>
 
       <main className="container mx-auto px-4 py-6">
-        {/* Quick Actions Section */}
-        <div className="mb-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Hành động nhanh</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <AddTaskDialog onSuccess={forceRefresh} />
-                <IcsImporter onSuccess={forceRefresh} />
-                <Button
-                  variant="outline"
-                  onClick={() => setView('dashboard')}
-                  className="h-20 flex flex-col items-center justify-center gap-2"
-                >
-                  <FileText className="h-6 w-6" />
-                  <span className="text-sm">Xem báo cáo</span>
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    rollover.mutate({ now: new Date().toISOString() });
-                    toast.success("Đã thực hiện rollover");
-                  }}
-                  className="h-20 flex flex-col items-center justify-center gap-2"
-                >
-                  <RotateCcw className="h-6 w-6" />
-                  <span className="text-sm">Rollover</span>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
 
         {view === 'matrix' ? (
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -316,26 +285,52 @@ export default function Home() {
 
           </div>
         </div>
-                ) : view === 'dashboard' ? (
-                  <div>
-                    <div className="mb-6">
-                      <h2 className="text-xl font-semibold mb-2">Dashboard thông minh</h2>
-                      <p className="text-sm text-muted-foreground">
-                        Tổng quan và thống kê chi tiết về công việc của bạn
-                      </p>
-                    </div>
-                    {tasksLoading ? (
-                      <div className="flex items-center justify-center py-12">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                      </div>
-                    ) : (
-                      <SmartDashboard
-                        tasks={tasks || []}
-                        reminders={reminders || []}
-                        onRefresh={forceRefresh}
-                      />
-                    )}
+        ) : view === 'dashboard' ? (
+          <div>
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold mb-2">Dashboard thông minh</h2>
+              <p className="text-sm text-muted-foreground">
+                Tổng quan và thống kê chi tiết về công việc của bạn
+              </p>
+            </div>
+            {tasksLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : (
+              <SmartDashboard
+                tasks={tasks || []}
+                reminders={reminders || []}
+                onRefresh={forceRefresh}
+              />
+            )}
+            
+            {/* Quick Actions - chỉ hiển thị ở Dashboard */}
+            <div className="mt-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Hành động nhanh</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <AddTaskDialog onSuccess={forceRefresh} />
+                    <IcsImporter onSuccess={forceRefresh} />
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        rollover.mutate({ now: new Date().toISOString() });
+                        toast.success("Đã thực hiện rollover");
+                      }}
+                      className="h-20 flex flex-col items-center justify-center gap-2"
+                    >
+                      <RotateCcw className="h-6 w-6" />
+                      <span className="text-sm">Rollover</span>
+                    </Button>
                   </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
                 ) : (
                   <AdminDashboard />
                 )}
