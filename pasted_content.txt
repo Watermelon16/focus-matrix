@@ -1,0 +1,185 @@
+Hãy tự động thiết kế, dựng, cấu hình bảo mật, viết mã, kiểm thử và đóng gói một ứng dụng web to-do cá nhân bảo mật cao theo tiêu chuẩn sau. Làm theo tuần tự, không bỏ bước, và đảm bảo mọi đầu việc đều có deliverable trong repo.
+•	0) Mục tiêu & Ràng buộc
+•	Sản phẩm: Focus Matrix – web to-do cá nhân dạng ma trận Eisenhower (UI/UNI/NUI/NUNI), hỗ trợ:
+o	Nhập việc hằng ngày: tên, ghi chú, deadline, phân loại (Urgent/Important), trạng thái done.
+o	Ma trận 2×2 trực quan (kéo-thả đổi ô), tick hoàn thành.
+o	Rollover: việc chưa xong tự “tái xuất” ngày sau; tính “Còn X ngày/Quá hạn X ngày”.
+o	Bảng tổng hợp trong ngày: đã hoàn thành, chưa hoàn thành.
+o	Import lịch ICS (MVP), không cần OAuth ở bản đầu.
+o	PWA offline-first: chạy không mạng, dữ liệu local-first.
+o	Bảo mật mặc định cao: E2EE tuỳ chọn (bản Minimum: mã hoá cục bộ at-rest bằng WebCrypto; bản Plus: sync E2EE).
+•	Ngôn ngữ: TypeScript + React.
+•	Framework: Next.js 15 (App Router), Tailwind, shadcn/ui.
+•	DB cục bộ: IndexedDB (Dexie).
+•	Timezone mặc định: Asia/Singapore.
+•	Triết lý: less is more. Không dùng analytics mặc định. CSP nghiêm ngặt, a11y tốt.
+•	1) Scaffold & Hạ tầng
+1.	Tạo repo private: focus-matrix.
+2.	Khởi tạo dự án:
+o	Next.js 15 (App Router, TypeScript), Tailwind, shadcn/ui (cấu hình alias @/components, @/lib, @/db, @/security, @/types, @/jobs, @/sync, @/integrations).
+o	PWA: manifest.webmanifest, service worker, icons.
+o	ESLint, Prettier, Husky + lint-staged (pre-commit).
+3.	CI/CD:
+o	GitHub Actions: job build, unit test, e2e (Playwright headless), upload artifact.
+o	Deploy frontend: Vercel (project private).
+4.	Tài liệu & chính sách:
+o	README.md (cách chạy/dev/deploy), SECURITY.md, PRIVACY.md (zero-knowledge), CONTRIBUTING.md.
+5.	Biến môi trường (thiết lập .env.local.example):
+6.	NEXT_PUBLIC_APP_NAME=Focus Matrix
+7.	NEXT_PUBLIC_DEFAULT_TIMEZONE=Asia/Singapore
+8.	HTTP headers & CSP (Next middleware):
+o	Strict-Transport-Security, X-Content-Type-Options, Referrer-Policy, Permissions-Policy tối thiểu.
+o	CSP: chặn inline script/style; chỉ cho phép self + vercel asset; không unsafe-inline, không eval.
+•	2) Mô hình dữ liệu & Kho cục bộ
+•	Tạo @/types/index.ts:
+•	export type Priority = "UI" | "UNI" | "NUI" | "NUNI";
+•	
+•	export interface Task {
+•	  id: string;
+•	  title: string;
+•	  notes?: string;
+•	  createdAt: string;   // ISO
+•	  dueDate?: string;    // ISO
+•	  priority: Priority;
+•	  completed: boolean;
+•	  completedAt?: string;
+•	  origin?: "manual" | "ics" | "gcal" | "apple";
+•	  sourceEventId?: string;
+•	  rolloverCount: number;
+•	}
+•	Dexie schema @/db/schema.ts + repo @/db/repo.ts:
+o	Bảng tasks (chỉ mục theo dueDate, completed, priority).
+o	Hàm: upsertTask, listTasksByDay(dateISO), listOverdue(nowISO), markDone(id), movePriority(id, to).
+o	Test unit cho CRUD và truy vấn.
+•	3) Bảo mật (Local-first, at-rest encryption) & E2EE chuẩn bị
+•	@/security/vault.ts:
+o	WebCrypto AES-GCM mã hoá record-level trước khi ghi IndexedDB.
+o	Key derivation từ passphrase (Argon2id) hoặc tạo key ngẫu nhiên lưu trong WebAuthn/Passkey (nếu trình duyệt hỗ trợ).
+o	API: initVault(), encryptRecord(obj), decryptRecord(blob), rotateKey(), exportRecoveryCode().
+•	Giao diện Vault Setup tối giản: chọn “Đặt passphrase” hoặc “Dùng Passkey”. Lưu ý: passphrase không gửi ra ngoài.
+•	Ghi chú: MVP chưa cần sync; nhưng thiết kế API để mở rộng lên E2EE sync (CRDT) sau này.
+•	4) Ma trận Eisenhower & Dashboard
+•	Component @/components/EisenhowerMatrix.tsx:
+o	Grid 2×2; mỗi ô: tiêu đề (“Khẩn cấp & Quan trọng”…), danh sách card.
+o	Card: title, badge “Còn X ngày/Hạn hôm nay/Quá hạn X ngày”, select đổi priority, checkbox done.
+o	Drag-and-drop hoặc select đổi nhanh (ưu tiên A11y, keyboard-friendly).
+•	Hàm date helper daysLeft(due?: string) xử lý timezone Asia/Singapore.
+•	Trang app/(dashboard)/page.tsx:
+o	Panel trái: Matrix.
+o	Panel phải: “Đã hoàn thành hôm nay” & “Chưa hoàn thành”, filter theo ngày, export CSV/JSON (client-side).
+•	Command palette (Ctrl/⌘+K): “Thêm việc nhanh”.
+•	5) Rollover Engine
+•	File @/jobs/rollover.ts:
+o	Chạy khi mở app hoặc qua Background Sync lúc đổi sang ngày mới (00:00 local).
+o	Với task chưa hoàn thành hôm trước:
+	Giữ nguyên dueDate, tăng rolloverCount.
+	Nếu now > dueDate: gắn trạng thái quá hạn (để UI hiển thị badge đỏ)/tự nâng “Urgent” (quy tắc tuỳ chọn, để true mặc định).
+•	Unit test mô phỏng chuyển ngày; kiểm tra flag & count.
+•	6) Import lịch ICS (MVP, client-side)
+•	@/components/IcsImporter.tsx:
+o	Kéo-thả/Upload tệp .ics; parse client-side (không gửi server).
+o	Preview danh sách sự kiện (7 ngày tới, có timezone).
+o	Mapping: dueDate = start (người dùng có thể đổi), origin="ics".
+o	Tạo tasks theo checkbox chọn.
+•	Test với nhiều biến thể ICS (UTC, TZID, RRULE đơn giản).
+•	7) UI/UX & A11y
+•	Tailwind + shadcn/ui, kiểu tối giản: nhiều khoảng trắng, font rõ, focus ring chuẩn, tương phản WCAG.
+•	Màu nhấn nhẹ theo ô:
+o	UI: đỏ nhạt; UNI: cam nhạt; NUI: xanh dương nhạt; NUNI: xám nhạt.
+•	I18n: đặt NEXT_PUBLIC_DEFAULT_TIMEZONE=Asia/Singapore để render badge ngày chính xác.
+•	8) PWA & Offline
+•	Service Worker: cache static assets + app shell; chiến lược stale-while-revalidate cho tệp tĩnh.
+•	Manifest: icons, theme color, display standalone.
+•	Kiểm thử offline: app hoạt động đầy đủ (CRUD tasks, matrix, dashboard, ICS import).
+•	9) (Tuỳ chọn sau MVP) Chuẩn bị Sync E2EE
+•	Không bắt buộc ở MVP, nhưng tạo sẵn thư mục:
+o	@/sync/ (abstract interface CRDT: apply/update), chưa implement backend.
+o	@/integrations/googleCalendar.ts: stub only; khi bật sẽ đọc-only Events.list (token cất trong vault).
+•	10) Bảo mật web nâng cao
+•	Middleware headers:
+o	Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+o	X-Content-Type-Options: nosniff
+o	Referrer-Policy: no-referrer
+o	Permissions-Policy: geolocation=(), microphone=(), camera=(), usb=()
+•	CSP ví dụ (điều chỉnh theo Vercel):
+o	default-src 'self';
+o	script-src 'self';
+o	style-src 'self' 'unsafe-inline'; (chỉ cho inline tối thiểu Tailwind SSR nếu thật sự cần, ưu tiên bỏ)
+o	img-src 'self' data:;
+o	font-src 'self';
+o	connect-src 'self';
+o	frame-ancestors 'none';
+•	Sanitize notes bằng DOMPurify (nếu render HTML; mặc định notes là text thuần).
+•	Nút Xoá toàn bộ dữ liệu cục bộ (wipe IndexedDB + key vault) trong trang Settings.
+•	11) Kiểm thử & Chất lượng
+•	Unit tests (Vitest/Jest):
+o	Repo Dexie: CRUD, filter theo ngày, overdue.
+o	Vault: encrypt→decrypt, rotateKey, recoveryCode.
+o	Rollover: đổi ngày, gắn quá hạn.
+•	Component tests:
+o	EisenhowerMatrix: chuyển priority, tick done; A11y (tab/enter/space).
+•	E2E (Playwright):
+o	Tạo việc → hiển thị đúng ô → đổi ô → tick done → xuất CSV.
+o	Import ICS (mock file) → preview → tạo tasks.
+o	Offline mode: tắt network → app vẫn chạy, CRUD ok.
+•	CI bắt buộc pass trước khi deploy.
+•	12) Cấu trúc thư mục (chuẩn hoá)
+focus-matrix/
+├─ app/
+│  ├─ (dashboard)/page.tsx
+│  ├─ layout.tsx
+│  └─ globals.css
+├─ components/
+│  ├─ EisenhowerMatrix.tsx
+│  ├─ IcsImporter.tsx
+│  └─ ui/* (shadcn)
+├─ db/
+│  ├─ schema.ts
+│  └─ repo.ts
+├─ security/
+│  └─ vault.ts
+├─ jobs/
+│  └─ rollover.ts
+├─ lib/
+│  ├─ date.ts
+│  └─ utils.ts
+├─ types/
+│  └─ index.ts
+├─ public/
+│  ├─ icons/*
+│  └─ manifest.webmanifest
+├─ tests/
+│  ├─ unit/*
+│  ├─ component/*
+│  └─ e2e/*
+├─ middleware.ts      # set CSP & headers
+├─ next.config.mjs
+├─ package.json
+├─ README.md
+├─ SECURITY.md
+├─ PRIVACY.md
+└─ CONTRIBUTING.md
+•	13) Tiêu chí nghiệm thu (Definition of Done)
+•	Chạy pnpm install && pnpm build && pnpm test pass.
+•	CI GitHub Actions pass (unit + e2e).
+•	Deploy Vercel thành công (private).
+•	PWA: Installable, offline hoạt động (CRUD + Matrix + Dashboard).
+•	ICS import hoạt động, không gửi file ra server.
+•	Dữ liệu lưu IndexedDB và được mã hoá at-rest (có test chứng minh không đọc được plaintext từ store).
+•	CSP/headers áp dụng, không có console security errors.
+•	UI đáp ứng (responsive), a11y cơ bản pass (tab navigation).
+•	Không thu thập analytics mặc định.
+•	Trang Settings có Xoá dữ liệu an toàn.
+•	14) Lệnh chạy (chuẩn hoá)
+•	Dev: pnpm dev
+•	Build: pnpm build
+•	Test: pnpm test (unit + component), pnpm test:e2e
+•	Lint: pnpm lint
+•	Format: pnpm format
+•	15) Ghi chú kỹ thuật quan trọng
+•	Tính “Còn X ngày”: so sánh ngày (00:00 local), không so ms; hiển thị: “Còn N ngày”, “Hạn hôm nay”, “Quá hạn N ngày”.
+•	Drag-drop: nếu chưa bật thư viện, dùng select đổi priority để giữ A11y.
+•	Mặc định không có backend. Tất cả xử lý ICS/crypto/DB client-side.
+•	Đường lên E2EE sync: sau MVP thêm @/sync với CRDT (Yjs/Automerge) + relay server chỉ giữ ciphertext.
+Hãy thực hiện toàn bộ các bước trên, commit theo từng mốc (scaffold → db → vault → matrix → rollover → ics → pwa → tests → ci → deploy), đính kèm hướng dẫn ngắn trong README.md. Khi hoàn tất, xuất các artefact (link deploy, badge CI) và liệt kê kết quả kiểm thử.
+
