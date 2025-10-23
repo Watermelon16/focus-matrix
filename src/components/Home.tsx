@@ -4,14 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { APP_TITLE } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { EisenhowerMatrix } from "./EisenhowerMatrix";
-import { AddTaskDialog } from "./AddTaskDialog";
-import { IcsImporter } from "./IcsImporter";
 import { UserProfile } from "./UserProfile";
 import { SmartDashboard } from "./SmartDashboard";
 import { EditReminderDialog } from "./EditReminderDialog";
 import { LoginDialog } from "./LoginDialog";
 import { AdminDashboard } from "./AdminDashboard";
-import { Loader2, LogOut, Trash2, BarChart3, Grid3X3, Users, RotateCcw } from "lucide-react";
+import { Loader2, LogOut, Trash2, BarChart3, Grid3X3, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { getNow } from "@/lib/date";
 import { useEffect, useState } from "react";
@@ -21,6 +19,15 @@ import { useTrpcState } from "@/hooks/useTrpcState";
 export default function Home() {
   const { user, loading, isAuthenticated, logout } = useAuth();
   const [view, setView] = useState<'matrix' | 'dashboard' | 'admin'>('matrix');
+  
+  // Auto-route based on user role when user changes
+  useEffect(() => {
+    if (user?.email === 'phuonglh43@gmail.com') {
+      setView('admin'); // Admin goes to admin tab
+    } else if (user) {
+      setView('matrix'); // Regular users go to matrix
+    }
+  }, [user]);
   const refreshKey = useTrpcState(); // Real-time state management
   
   // Debug logs
@@ -37,13 +44,6 @@ export default function Home() {
     window.dispatchEvent(new CustomEvent('trpc-state-change'));
   };
 
-  const rollover = trpc.tasks.rollover.useMutation({
-    onSuccess: (results: any) => {
-      if (results.processed > 0) {
-        refetch();
-      }
-    },
-  });
   
   
   const deleteReminder = trpc.reminders.delete.useMutation({
@@ -53,20 +53,20 @@ export default function Home() {
     },
   });
 
-  // Run rollover on mount
-  useEffect(() => {
-    if (isAuthenticated) {
-      const lastRollover = localStorage.getItem('lastRollover');
-      const now = new Date().toISOString();
-      const today = now.split('T')[0];
-      const lastDay = lastRollover?.split('T')[0];
+  // Rollover is automatic - no need for manual trigger
+  // useEffect(() => {
+  //   if (isAuthenticated) {
+  //     const lastRollover = localStorage.getItem('lastRollover');
+  //     const now = new Date().toISOString();
+  //     const today = now.split('T')[0];
+  //     const lastDay = lastRollover?.split('T')[0];
 
-      if (lastDay !== today) {
-        rollover.mutate({ now });
-        localStorage.setItem('lastRollover', now);
-      }
-    }
-  }, [isAuthenticated]);
+  //     if (lastDay !== today) {
+  //       rollover.mutate({ now });
+  //       localStorage.setItem('lastRollover', now);
+  //     }
+  //   }
+  // }, [isAuthenticated]);
 
   if (loading) {
     return (
@@ -305,31 +305,6 @@ export default function Home() {
               />
             )}
             
-            {/* Quick Actions - chỉ hiển thị ở Dashboard */}
-            <div className="mt-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Hành động nhanh</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    <AddTaskDialog onSuccess={forceRefresh} />
-                    <IcsImporter onSuccess={forceRefresh} />
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        rollover.mutate({ now: new Date().toISOString() });
-                        toast.success("Đã thực hiện rollover");
-                      }}
-                      className="h-20 flex flex-col items-center justify-center gap-2"
-                    >
-                      <RotateCcw className="h-6 w-6" />
-                      <span className="text-sm">Rollover</span>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
           </div>
                 ) : (
                   <AdminDashboard />

@@ -40,23 +40,14 @@ interface MockUser {
   joinedAt: string;
 }
 
-// Mock users storage
+// Mock users storage - EMPTY INITIALLY, only real registered users
 let mockUsers: MockUser[] = [
   {
     id: 'user-1',
     name: 'Phuong Admin',
     email: 'phuonglh43@gmail.com',
-    passwordHash: 'password123', // For demo purposes, not secure
+    passwordHash: '010486', // Admin password
     role: 'admin',
-    status: 'active',
-    joinedAt: new Date().toISOString(),
-  },
-  {
-    id: 'user-2',
-    name: 'Demo User',
-    email: 'demo@example.com',
-    passwordHash: 'password123', // For demo purposes, not secure
-    role: 'user',
     status: 'active',
     joinedAt: new Date().toISOString(),
   },
@@ -281,6 +272,17 @@ export const trpc = {
         };
       }
     },
+    // Replace all tasks (used by Drive restore)
+    replaceAll: {
+      useMutation: (_options?: any) => ({
+        mutate: (data: { tasks: Task[] }) => {
+          mockTasks = Array.isArray(data.tasks) ? [...data.tasks] : [];
+          triggerStateChange();
+          return Promise.resolve();
+        },
+        isPending: false 
+      })
+    },
     rollover: {
       useMutation: (_options?: any) => ({ 
         mutate: (_data: any) => {
@@ -340,6 +342,17 @@ export const trpc = {
           isPending: isPending
         };
       }
+    },
+    // Replace all reminders (used by Drive restore)
+    replaceAll: {
+      useMutation: (_options?: any) => ({
+        mutate: (data: { reminders: Reminder[] }) => {
+          mockReminders = Array.isArray(data.reminders) ? [...data.reminders] : [];
+          triggerStateChange();
+          return Promise.resolve();
+        },
+        isPending: false 
+      })
     }
   }
 };

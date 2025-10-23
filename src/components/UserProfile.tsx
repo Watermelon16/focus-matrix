@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,8 +13,8 @@ import {
 } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { trpc } from "@/lib/trpc";
-import { User, Settings, Lock, Trash2, AlertTriangle, Users, Link as LinkIcon } from "lucide-react";
-import { GoogleLogin } from '@react-oauth/google';
+import { User, Settings, Lock, Trash2, AlertTriangle } from "lucide-react";
+import { createOrUpdateJsonFile, readJsonFile, datasetToBase64, base64ToDataset } from "@/lib/drive";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -32,6 +31,7 @@ export function UserProfile({ onRefresh }: UserProfileProps) {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showResetDialog, setShowResetDialog] = useState(false);
+  const [driveFileId, setDriveFileId] = useState<string | null>(localStorage.getItem('drive_file_id') || null);
 
   const deleteAllTasks = trpc.tasks.deleteAll.useMutation({
     onSuccess: () => {
@@ -43,6 +43,58 @@ export function UserProfile({ onRefresh }: UserProfileProps) {
       toast.error(`Lỗi: ${error.message}`);
     },
   });
+
+  // Replace datasets – used for restore
+  const replaceTasks = trpc.tasks.replaceAll.useMutation();
+  const replaceReminders = trpc.reminders.replaceAll.useMutation();
+
+  // NOTE: For demo, we reuse Google One Tap credential (if available) as token placeholder
+  const getAccessToken = (): string | null => {
+    // In production, implement OAuth Code flow to get access token
+    const token = (window as any).__googleAccessToken as string | undefined;
+    return token || null;
+  };
+
+  const handleBackupToDrive = async () => {
+    const accessToken = getAccessToken();
+    if (!accessToken) {
+      toast.error("Cần kết nối Google để sao lưu");
+      return;
+    }
+    try {
+      // Gather current data from trpc mocks
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const tasks: any[] = (trpc as any).tasks.list.useQuery().data || [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const reminders: any[] = (trpc as any).reminders.list.useQuery().data || [];
+      const payload = datasetToBase64({ tasks, reminders });
+      const name = user?.email === 'phuonglh43@gmail.com' ? 'focus-matrix-system-backup.json' : 'focus-matrix-user-backup.json';
+      const res = await createOrUpdateJsonFile(accessToken, driveFileId, name, payload);
+      setDriveFileId(res.id);
+      localStorage.setItem('drive_file_id', res.id);
+      toast.success("Đã sao lưu lên Google Drive");
+    } catch (e: any) {
+      toast.error(`Lỗi sao lưu: ${e.message}`);
+    }
+  };
+
+  const handleRestoreFromDrive = async () => {
+    const accessToken = getAccessToken();
+    if (!accessToken || !driveFileId) {
+      toast.error("Chưa có kết nối Google hoặc file sao lưu");
+      return;
+    }
+    try {
+      const b64 = await readJsonFile(accessToken, driveFileId);
+      const dataset = base64ToDataset(b64);
+      replaceTasks.mutate({ tasks: dataset.tasks || [] });
+      replaceReminders.mutate({ reminders: dataset.reminders || [] });
+      onRefresh?.();
+      toast.success("Khôi phục dữ liệu thành công");
+    } catch (e: any) {
+      toast.error(`Lỗi khôi phục: ${e.message}`);
+    }
+  };
 
   const handleSaveProfile = () => {
     if (!name.trim()) {
@@ -66,32 +118,6 @@ export function UserProfile({ onRefresh }: UserProfileProps) {
     setOpen(false);
   };
 
-  const [googleEmail, setGoogleEmail] = useState<string | null>(user?.email || null);
-
-  const renderGoogleAuth = () => (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Users className="h-4 w-4" />
-          <span className="text-sm">Kết nối Google</span>
-        </div>
-        {googleEmail ? (
-          <Badge variant="secondary">{googleEmail}</Badge>
-        ) : null}
-      </div>
-      <GoogleLogin
-        onSuccess={(credentialResponse) => {
-          // NOTE: The library also supports getting access_token directly via code exchange flow
-          // Here we store the raw credential for demo, you should exchange it server-side.
-          (window as any).__googleAccessToken = credentialResponse?.credential || '';
-          setGoogleEmail('Đã kết nối');
-          toast.success('Đã kết nối Google');
-        }}
-        onError={() => toast.error('Kết nối Google thất bại')}
-        useOneTap
-      />
-    </div>
-  );
 
   const handleChangePassword = () => {
     if (!currentPassword) {
@@ -143,18 +169,6 @@ export function UserProfile({ onRefresh }: UserProfileProps) {
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          {/* Kết nối Google */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <LinkIcon className="h-4 w-4" />
-                Tài khoản & kết nối
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {renderGoogleAuth()}
-            </CardContent>
-          </Card>
           {/* Thông tin cá nhân */}
           <Card>
             <CardHeader>
@@ -185,6 +199,33 @@ export function UserProfile({ onRefresh }: UserProfileProps) {
               </div>
             </CardContent>
           </Card>
+
+        {/* Sao lưu & Khôi phục Google Drive */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              Sao lưu & Khôi phục (Google Drive)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={handleBackupToDrive}>
+                Sao lưu lên Drive
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleRestoreFromDrive} disabled={!driveFileId}>
+                Khôi phục từ Drive
+              </Button>
+            </div>
+            {!driveFileId ? (
+              <p className="text-xs text-muted-foreground">Chưa có file sao lưu. Hãy bấm "Sao lưu lên Drive".</p>
+            ) : (
+              <p className="text-xs text-muted-foreground">Đã liên kết file: {driveFileId}</p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Lưu ý: Cần đăng nhập Google One Tap để cấp quyền tạm thời. Phiên bản này chỉ là demo client-side.
+            </p>
+          </CardContent>
+        </Card>
 
           {/* Thay đổi mật khẩu */}
           <Card>

@@ -3,6 +3,12 @@
 
 export type DriveScope = 'appdata' | 'file';
 
+export interface DriveDataset {
+  tasks: any[];
+  reminders: any[];
+  users?: any[]; // only for admin backup
+}
+
 function driveBaseHeaders(accessToken: string) {
   return { Authorization: `Bearer ${accessToken}` };
 }
@@ -70,6 +76,20 @@ export async function readJsonFile(accessToken: string, fileId: string) {
   if (!res.ok) throw new Error('Read file failed');
   const text = await res.text();
   return btoa(text);
+}
+
+/**
+ * Serialize dataset to base64 JSON
+ */
+export function datasetToBase64(dataset: DriveDataset): string {
+  return btoa(JSON.stringify(dataset));
+}
+
+/**
+ * Parse base64 JSON to dataset
+ */
+export function base64ToDataset(b64: string): DriveDataset {
+  return JSON.parse(atob(b64));
 }
 
 export async function setPermission(accessToken: string, fileOrFolderId: string, email: string, role: 'reader' | 'writer') {
