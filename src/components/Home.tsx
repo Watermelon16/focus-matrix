@@ -1,7 +1,8 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { APP_TITLE, getLoginUrl } from "@/const";
+import { APP_TITLE } from "@/const";
+import { GoogleLogin } from '@react-oauth/google';
 import { trpc } from "@/lib/trpc";
 import { EisenhowerMatrix } from "./EisenhowerMatrix";
 import { AddTaskDialog } from "./AddTaskDialog";
@@ -78,9 +79,32 @@ export default function Home() {
               <Badge variant="outline">🔵 Không ưu tiên</Badge>
             </div>
           </div>
-          <Button size="lg" className="w-full" asChild>
-            <a href={getLoginUrl()}>Đăng nhập để bắt đầu</a>
-          </Button>
+          <div className="w-full">
+            <GoogleLogin
+              onSuccess={(credentialResponse) => {
+                console.log('Google login success:', credentialResponse);
+                // Mock user for demo
+                const demoUser = {
+                  id: credentialResponse.credential || 'demo-user',
+                  name: 'Google User',
+                  email: 'google.user@example.com'
+                };
+                // In a real app, you'd send this credential to your backend
+                // For now, we'll just show a success message
+                toast.success("Đăng nhập Google thành công!");
+              }}
+              onError={() => {
+                console.error('Google login failed');
+                toast.error("Đăng nhập Google thất bại.");
+              }}
+              useOneTap
+              theme="outline"
+              size="large"
+              text="signin_with"
+              shape="rectangular"
+              width="100%"
+            />
+          </div>
           <p className="text-xs text-muted-foreground">
             ✅ Offline-first • 🔒 Mã hóa E2EE • ☁️ Sync Google Drive
           </p>
