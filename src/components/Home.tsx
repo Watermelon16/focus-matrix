@@ -82,7 +82,7 @@ export default function Home() {
               <Badge variant="outline">🔵 Không ưu tiên</Badge>
             </div>
           </div>
-          <div className="w-full">
+          <div className="w-full space-y-3">
             <GoogleLogin
               onSuccess={(credentialResponse) => {
                 console.log('Google login success:', credentialResponse);
@@ -109,6 +109,26 @@ export default function Home() {
               shape="rectangular"
               width="100%"
             />
+            
+            {/* Test button để bypass Google OAuth */}
+            <Button 
+              variant="outline" 
+              className="w-full"
+              onClick={() => {
+                console.log('Test login clicked');
+                const testUser = {
+                  id: 'test-user',
+                  name: 'Test User',
+                  email: 'test@example.com'
+                };
+                console.log('Calling login with test user:', testUser);
+                login(testUser);
+                console.log('Test login called');
+                toast.success("Đăng nhập test thành công!");
+              }}
+            >
+              🔧 Test Login (Bypass Google)
+            </Button>
           </div>
           <p className="text-xs text-muted-foreground">
             ✅ Offline-first • 🔒 Mã hóa E2EE • ☁️ Sync Google Drive
