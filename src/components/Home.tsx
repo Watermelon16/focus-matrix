@@ -20,6 +20,9 @@ import { toast } from "sonner";
 export default function Home() {
   const { user, loading, isAuthenticated, logout, login } = useAuth();
   const [view, setView] = useState<'matrix' | 'dashboard'>('matrix');
+  
+  // Debug logs
+  console.log('Home render:', { user, loading, isAuthenticated });
   const { data: tasks, isLoading: tasksLoading, refetch } = trpc.tasks.list.useQuery();
   
   const { data: reminders, refetch: refetchReminders } = trpc.reminders.list.useQuery();
@@ -89,8 +92,10 @@ export default function Home() {
                   name: 'Google User',
                   email: 'google.user@example.com'
                 };
+                console.log('Calling login with:', demoUser);
                 // Call login function to update auth state
                 login(demoUser);
+                console.log('Login called, should trigger re-render');
                 toast.success("Đăng nhập Google thành công!");
               }}
               onError={() => {

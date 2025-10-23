@@ -13,9 +13,12 @@ const queryClient = new QueryClient({
 })
 
 function App() {
+  const clientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || 'demo-client-id';
+  console.log('Google Client ID:', clientId);
+  
   return (
     <QueryClientProvider client={queryClient}>
-      <GoogleOAuthProvider clientId={(import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || ''}>
+      <GoogleOAuthProvider clientId={clientId}>
         <AuthProvider>
           <div className="min-h-screen bg-background">
             <Home />
