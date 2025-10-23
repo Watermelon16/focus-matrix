@@ -4,6 +4,7 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [react()],
+  base: "/focus-matrix/",
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
