@@ -83,12 +83,6 @@ export default function Home() {
             <GoogleLogin
               onSuccess={(credentialResponse) => {
                 console.log('Google login success:', credentialResponse);
-                // Mock user for demo
-                const demoUser = {
-                  id: credentialResponse.credential || 'demo-user',
-                  name: 'Google User',
-                  email: 'google.user@example.com'
-                };
                 // In a real app, you'd send this credential to your backend
                 // For now, we'll just show a success message
                 toast.success("Đăng nhập Google thành công!");
