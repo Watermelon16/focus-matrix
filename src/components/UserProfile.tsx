@@ -19,7 +19,11 @@ import { GoogleLogin } from '@react-oauth/google';
 import { useState } from "react";
 import { toast } from "sonner";
 
-export function UserProfile() {
+interface UserProfileProps {
+  onRefresh?: () => void;
+}
+
+export function UserProfile({ onRefresh }: UserProfileProps) {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(user?.name || "");
@@ -33,6 +37,7 @@ export function UserProfile() {
     onSuccess: () => {
       toast.success("Đã xóa tất cả công việc");
       setShowResetDialog(false);
+      onRefresh?.();
     },
     onError: (error: any) => {
       toast.error(`Lỗi: ${error.message}`);

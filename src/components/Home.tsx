@@ -20,12 +20,16 @@ import { toast } from "sonner";
 export default function Home() {
   const { user, loading, isAuthenticated, logout, login } = useAuth();
   const [view, setView] = useState<'matrix' | 'dashboard'>('matrix');
-  
   // Debug logs
   console.log('Home render:', { user, loading, isAuthenticated });
   const { data: tasks, isLoading: tasksLoading, refetch } = trpc.tasks.list.useQuery();
   
   const { data: reminders, refetch: refetchReminders } = trpc.reminders.list.useQuery();
+
+  // Force refresh function
+  const forceRefresh = () => {
+    refetch();
+  };
 
   const rollover = trpc.tasks.rollover.useMutation({
     onSuccess: (results: any) => {
@@ -197,9 +201,9 @@ export default function Home() {
               <BarChart3 className="mr-2 h-4 w-4" />
               Dashboard
             </Button>
-            <IcsImporter onSuccess={() => refetch()} />
-            <AddTaskDialog onSuccess={() => refetch()} />
-            <UserProfile />
+            <IcsImporter onSuccess={forceRefresh} />
+            <AddTaskDialog onSuccess={forceRefresh} />
+            <UserProfile onRefresh={forceRefresh} />
             {/* Team settings - requires Google access token, for demo we render button and ask for login first */}
             <TeamSettings accessToken={(window as any).__googleAccessToken || ''} />
             <Button variant="outline" onClick={() => logout()}>
@@ -226,7 +230,7 @@ export default function Home() {
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>
               ) : (
-                <EisenhowerMatrix tasks={tasks || []} onRefresh={() => refetch()} />
+                <EisenhowerMatrix tasks={tasks || []} onRefresh={forceRefresh} />
               )}
             </div>
 
@@ -337,11 +341,11 @@ export default function Home() {
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
             ) : (
-              <SmartDashboard 
-                tasks={tasks || []} 
-                reminders={reminders || []} 
-                onRefresh={() => refetch()} 
-              />
+                      <SmartDashboard
+                        tasks={tasks || []}
+                        reminders={reminders || []}
+                        onRefresh={forceRefresh}
+                      />
             )}
           </div>
         )}
