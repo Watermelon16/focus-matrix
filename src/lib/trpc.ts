@@ -1,5 +1,12 @@
 import type { Task, Reminder } from '@/types';
 
+// Event system for notifying components of state changes
+let listeners: (() => void)[] = [];
+
+const notifyListeners = () => {
+  listeners.forEach(listener => listener());
+};
+
 // Mock state storage
 let mockTasks: Task[] = [
   {
@@ -72,20 +79,54 @@ export const trpc = {
   },
   tasks: {
     list: {
-      useQuery: (_options?: any) => ({
-        data: mockTasks, 
-        isLoading: false, 
-        refetch: () => Promise.resolve()
-      })
+      useQuery: (options?: any) => {
+        // Add listener for state changes
+        if (options?.onSuccess) {
+          listeners.push(options.onSuccess);
+        }
+        
+        return {
+          data: mockTasks, 
+          isLoading: false, 
+          refetch: () => {
+            notifyListeners();
+            return Promise.resolve();
+          }
+        };
+      }
     },
     create: {
       useMutation: (_options?: any) => ({ 
-        mutate: (_data: any) => {
-          console.log('Creating task:', _data);
+        mutate: (data: any) => {
+          console.log('Creating task:', data);
+          const newTask: Task = {
+            id: `task-${Date.now()}`,
+            title: data.title,
+            notes: data.notes || '',
+            createdAt: new Date().toISOString(),
+            dueDate: data.dueDate,
+            priority: data.priority,
+            completed: false,
+            rolloverCount: 0
+          };
+          mockTasks.push(newTask);
+          notifyListeners();
           return Promise.resolve();
         }, 
-        mutateAsync: (_data: any) => {
-          console.log('Creating task async:', _data);
+        mutateAsync: (data: any) => {
+          console.log('Creating task async:', data);
+          const newTask: Task = {
+            id: `task-${Date.now()}`,
+            title: data.title,
+            notes: data.notes || '',
+            createdAt: new Date().toISOString(),
+            dueDate: data.dueDate,
+            priority: data.priority,
+            completed: false,
+            rolloverCount: 0
+          };
+          mockTasks.push(newTask);
+          notifyListeners();
           return Promise.resolve({});
         }, 
         isPending: false 
@@ -98,6 +139,7 @@ export const trpc = {
           const taskIndex = mockTasks.findIndex(t => t.id === data.id);
           if (taskIndex !== -1) {
             mockTasks[taskIndex] = { ...mockTasks[taskIndex], ...data };
+            notifyListeners();
           }
           return Promise.resolve();
         },
@@ -109,6 +151,7 @@ export const trpc = {
         mutate: (data: any) => {
           console.log('Deleting task:', data);
           mockTasks = mockTasks.filter(t => t.id !== data.id);
+          notifyListeners();
           return Promise.resolve();
         },
         isPending: false
@@ -119,6 +162,7 @@ export const trpc = {
         mutate: () => {
           console.log('Deleting all tasks');
           mockTasks = [];
+          notifyListeners();
           return Promise.resolve();
         },
         isPending: false

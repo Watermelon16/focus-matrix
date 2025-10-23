@@ -86,17 +86,31 @@ export default function Home() {
             <GoogleLogin
               onSuccess={(credentialResponse) => {
                 console.log('Google login success:', credentialResponse);
-                // Mock user for demo
-                const demoUser = {
-                  id: credentialResponse.credential || 'demo-user',
-                  name: 'Google User',
-                  email: 'google.user@example.com'
-                };
-                console.log('Calling login with:', demoUser);
-                // Call login function to update auth state
-                login(demoUser);
-                console.log('Login called, should trigger re-render');
-                toast.success("Đăng nhập Google thành công!");
+                // Decode JWT token to get user info
+                try {
+                  if (!credentialResponse.credential) {
+                    throw new Error('No credential provided');
+                  }
+                  const payload = JSON.parse(atob(credentialResponse.credential.split('.')[1]));
+                  const googleUser = {
+                    id: payload.sub || 'google-user',
+                    name: payload.name || 'Google User',
+                    email: payload.email || 'google.user@example.com'
+                  };
+                  console.log('Calling login with Google user:', googleUser);
+                  login(googleUser);
+                  toast.success(`Đăng nhập thành công! Xin chào ${googleUser.name}`);
+                } catch (error) {
+                  console.error('Error decoding Google token:', error);
+                  // Fallback to mock user
+                  const demoUser = {
+                    id: 'demo-user',
+                    name: 'Google User',
+                    email: 'google.user@example.com'
+                  };
+                  login(demoUser);
+                  toast.success("Đăng nhập Google thành công!");
+                }
               }}
               onError={() => {
                 console.error('Google login failed');
