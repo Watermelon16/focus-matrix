@@ -11,7 +11,9 @@ import { UserProfile } from "./UserProfile";
 import { TeamSettings } from "./TeamSettings";
 import { SmartDashboard } from "./SmartDashboard";
 import { EditReminderDialog } from "./EditReminderDialog";
-import { Loader2, LogOut, Trash2, BarChart3, Grid3X3 } from "lucide-react";
+import { LoginDialog } from "./LoginDialog";
+import { AdminDashboard } from "./AdminDashboard";
+import { Loader2, LogOut, Trash2, BarChart3, Grid3X3, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { getNow } from "@/lib/date";
 import { useEffect, useState } from "react";
@@ -20,7 +22,7 @@ import { useTrpcState } from "@/hooks/useTrpcState";
 
 export default function Home() {
   const { user, loading, isAuthenticated, logout, login } = useAuth();
-  const [view, setView] = useState<'matrix' | 'dashboard'>('matrix');
+  const [view, setView] = useState<'matrix' | 'dashboard' | 'admin'>('matrix');
   const refreshKey = useTrpcState(); // Real-time state management
   
   // Debug logs
@@ -92,68 +94,51 @@ export default function Home() {
               <Badge variant="outline">🔵 Không ưu tiên</Badge>
             </div>
           </div>
-          <div className="w-full space-y-3">
-            <GoogleLogin
-              onSuccess={(credentialResponse) => {
-                console.log('Google login success:', credentialResponse);
-                // Decode JWT token to get user info
-                try {
-                  if (!credentialResponse.credential) {
-                    throw new Error('No credential provided');
-                  }
-                  const payload = JSON.parse(atob(credentialResponse.credential.split('.')[1]));
-                  const googleUser = {
-                    id: payload.sub || 'google-user',
-                    name: payload.name || 'Google User',
-                    email: payload.email || 'google.user@example.com'
-                  };
-                  console.log('Calling login with Google user:', googleUser);
-                  login(googleUser);
-                  toast.success(`Đăng nhập thành công! Xin chào ${googleUser.name}`);
-                } catch (error) {
-                  console.error('Error decoding Google token:', error);
-                  // Fallback to mock user
-                  const demoUser = {
-                    id: 'demo-user',
-                    name: 'Google User',
-                    email: 'google.user@example.com'
-                  };
-                  login(demoUser);
-                  toast.success("Đăng nhập Google thành công!");
-                }
-              }}
-              onError={() => {
-                console.error('Google login failed');
-                toast.error("Đăng nhập Google thất bại.");
-              }}
-              useOneTap
-              theme="outline"
-              size="large"
-              text="signin_with"
-              shape="rectangular"
-              width="100%"
-            />
-            
-            {/* Test button để bypass Google OAuth */}
-            <Button 
-              variant="outline" 
-              className="w-full"
-              onClick={() => {
-                console.log('Test login clicked');
-                const testUser = {
-                  id: 'test-user',
-                  name: 'Test User',
-                  email: 'test@example.com'
-                };
-                console.log('Calling login with test user:', testUser);
-                login(testUser);
-                console.log('Test login called');
-                toast.success("Đăng nhập test thành công!");
-              }}
-            >
-              🔧 Test Login (Bypass Google)
-            </Button>
-          </div>
+                  <div className="w-full space-y-3">
+                    <LoginDialog />
+                    
+                    {/* Google Login vẫn có sẵn */}
+                    <GoogleLogin
+                      onSuccess={(credentialResponse) => {
+                        console.log('Google login success:', credentialResponse);
+                        // Decode JWT token to get user info
+                        try {
+                          if (!credentialResponse.credential) {
+                            throw new Error('No credential provided');
+                          }
+                          const payload = JSON.parse(atob(credentialResponse.credential.split('.')[1]));
+                          const googleUser = {
+                            id: payload.sub || 'google-user',
+                            name: payload.name || 'Google User',
+                            email: payload.email || 'google.user@example.com'
+                          };
+                          console.log('Calling login with Google user:', googleUser);
+                          login(googleUser);
+                          toast.success(`Đăng nhập Google thành công! Xin chào ${googleUser.name}`);
+                        } catch (error) {
+                          console.error('Error decoding Google token:', error);
+                          // Fallback to mock user
+                          const demoUser = {
+                            id: 'demo-user',
+                            name: 'Google User',
+                            email: 'google.user@example.com'
+                          };
+                          login(demoUser);
+                          toast.success("Đăng nhập Google thành công!");
+                        }
+                      }}
+                      onError={() => {
+                        console.error('Google login failed');
+                        toast.error("Đăng nhập Google thất bại.");
+                      }}
+                      useOneTap
+                      theme="outline"
+                      size="large"
+                      text="signin_with"
+                      shape="rectangular"
+                      width="100%"
+                    />
+                  </div>
           <p className="text-xs text-muted-foreground">
             ✅ Offline-first • 🔒 Mã hóa E2EE • ☁️ Sync Google Drive
           </p>
@@ -199,14 +184,22 @@ export default function Home() {
               <Grid3X3 className="mr-2 h-4 w-4" />
               Ma trận
             </Button>
-            <Button
-              variant={view === 'dashboard' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setView('dashboard')}
-            >
-              <BarChart3 className="mr-2 h-4 w-4" />
-              Dashboard
-            </Button>
+                    <Button
+                      variant={view === 'dashboard' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setView('dashboard')}
+                    >
+                      <BarChart3 className="mr-2 h-4 w-4" />
+                      Dashboard
+                    </Button>
+                    <Button
+                      variant={view === 'admin' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setView('admin')}
+                    >
+                      <Users className="mr-2 h-4 w-4" />
+                      Quản trị
+                    </Button>
             <IcsImporter onSuccess={forceRefresh} />
             <AddTaskDialog onSuccess={forceRefresh} />
             <UserProfile onRefresh={forceRefresh} />
@@ -334,27 +327,29 @@ export default function Home() {
 
           </div>
         </div>
-        ) : (
-          <div>
-            <div className="mb-6">
-              <h2 className="text-xl font-semibold mb-2">Dashboard thông minh</h2>
-              <p className="text-sm text-muted-foreground">
-                Tổng quan và thống kê chi tiết về công việc của bạn
-              </p>
-            </div>
-            {tasksLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              </div>
-            ) : (
+                ) : view === 'dashboard' ? (
+                  <div>
+                    <div className="mb-6">
+                      <h2 className="text-xl font-semibold mb-2">Dashboard thông minh</h2>
+                      <p className="text-sm text-muted-foreground">
+                        Tổng quan và thống kê chi tiết về công việc của bạn
+                      </p>
+                    </div>
+                    {tasksLoading ? (
+                      <div className="flex items-center justify-center py-12">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                      </div>
+                    ) : (
                       <SmartDashboard
                         tasks={tasks || []}
                         reminders={reminders || []}
                         onRefresh={forceRefresh}
                       />
-            )}
-          </div>
-        )}
+                    )}
+                  </div>
+                ) : (
+                  <AdminDashboard />
+                )}
       </main>
     </div>
   );
