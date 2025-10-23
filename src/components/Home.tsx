@@ -16,19 +16,25 @@ import { Badge } from "@/components/ui/badge";
 import { getNow } from "@/lib/date";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { useTrpcState } from "@/hooks/useTrpcState";
 
 export default function Home() {
   const { user, loading, isAuthenticated, logout, login } = useAuth();
   const [view, setView] = useState<'matrix' | 'dashboard'>('matrix');
+  const refreshKey = useTrpcState(); // Real-time state management
+  
   // Debug logs
-  console.log('Home render:', { user, loading, isAuthenticated });
+  console.log('Home render:', { user, loading, isAuthenticated, refreshKey });
   const { data: tasks, isLoading: tasksLoading, refetch } = trpc.tasks.list.useQuery();
   
   const { data: reminders, refetch: refetchReminders } = trpc.reminders.list.useQuery();
 
   // Force refresh function
   const forceRefresh = () => {
+    console.log('Force refresh called');
     refetch();
+    // Also trigger custom event
+    window.dispatchEvent(new CustomEvent('trpc-state-change'));
   };
 
   const rollover = trpc.tasks.rollover.useMutation({

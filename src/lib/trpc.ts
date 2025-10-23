@@ -6,7 +6,23 @@ let refreshCounter = 0;
 
 const notifyListeners = () => {
   refreshCounter++;
-  listeners.forEach(listener => listener());
+  console.log('Notifying listeners, refreshCounter:', refreshCounter);
+  listeners.forEach(listener => {
+    try {
+      listener();
+    } catch (error) {
+      console.error('Error in listener:', error);
+    }
+  });
+};
+
+// Global state change event
+const triggerStateChange = () => {
+  notifyListeners();
+  // Also trigger a custom event for components to listen
+  window.dispatchEvent(new CustomEvent('trpc-state-change', { 
+    detail: { refreshCounter } 
+  }));
 };
 
 // Mock state storage
@@ -93,7 +109,7 @@ export const trpc = {
           // Force refresh by including counter
           refreshCounter,
           refetch: () => {
-            notifyListeners();
+            triggerStateChange();
             return Promise.resolve();
           }
         };
@@ -120,7 +136,7 @@ export const trpc = {
               rolloverCount: 0
             };
             mockTasks.push(newTask);
-            notifyListeners();
+            triggerStateChange();
             
             // Call onSuccess callback
             if (options?.onSuccess) {
@@ -146,7 +162,7 @@ export const trpc = {
               rolloverCount: 0
             };
             mockTasks.push(newTask);
-            notifyListeners();
+            triggerStateChange();
             
             isPending = false;
             return Promise.resolve({});
@@ -162,7 +178,7 @@ export const trpc = {
           const taskIndex = mockTasks.findIndex(t => t.id === data.id);
           if (taskIndex !== -1) {
             mockTasks[taskIndex] = { ...mockTasks[taskIndex], ...data };
-            notifyListeners();
+            triggerStateChange();
           }
           return Promise.resolve();
         },
@@ -180,7 +196,7 @@ export const trpc = {
             
             console.log('Deleting task:', data);
             mockTasks = mockTasks.filter(t => t.id !== data.id);
-            notifyListeners();
+            triggerStateChange();
             
             // Call onSuccess callback
             if (options?.onSuccess) {
@@ -205,7 +221,7 @@ export const trpc = {
             
             console.log('Deleting all tasks');
             mockTasks = [];
-            notifyListeners();
+            triggerStateChange();
             
             // Call onSuccess callback
             if (options?.onSuccess) {
@@ -256,13 +272,28 @@ export const trpc = {
       })
     },
     delete: {
-      useMutation: (_options?: any) => ({ 
-        mutate: (_data: any) => {
-          console.log('Deleting reminder:', _data);
-          return Promise.resolve();
-        }, 
-        isPending: false 
-      })
+      useMutation: (options?: any) => {
+        let isPending = false;
+        
+        return {
+          mutate: (data: any) => {
+            if (isPending) return;
+            isPending = true;
+            
+            console.log('Deleting reminder:', data);
+            mockReminders = mockReminders.filter(r => r.id !== data.id);
+            triggerStateChange();
+            
+            if (options?.onSuccess) {
+              options.onSuccess();
+            }
+            
+            isPending = false;
+            return Promise.resolve();
+          },
+          isPending: isPending
+        };
+      }
     }
   }
 };
