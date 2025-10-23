@@ -2,8 +2,10 @@ import type { Task, Reminder } from '@/types';
 
 // Event system for notifying components of state changes
 let listeners: (() => void)[] = [];
+let refreshCounter = 0;
 
 const notifyListeners = () => {
+  refreshCounter++;
   listeners.forEach(listener => listener());
 };
 
@@ -87,7 +89,9 @@ export const trpc = {
         
         return {
           data: mockTasks, 
-          isLoading: false, 
+          isLoading: false,
+          // Force refresh by including counter
+          refreshCounter,
           refetch: () => {
             notifyListeners();
             return Promise.resolve();
@@ -96,41 +100,60 @@ export const trpc = {
       }
     },
     create: {
-      useMutation: (_options?: any) => ({ 
-        mutate: (data: any) => {
-          console.log('Creating task:', data);
-          const newTask: Task = {
-            id: `task-${Date.now()}`,
-            title: data.title,
-            notes: data.notes || '',
-            createdAt: new Date().toISOString(),
-            dueDate: data.dueDate,
-            priority: data.priority,
-            completed: false,
-            rolloverCount: 0
-          };
-          mockTasks.push(newTask);
-          notifyListeners();
-          return Promise.resolve();
-        }, 
-        mutateAsync: (data: any) => {
-          console.log('Creating task async:', data);
-          const newTask: Task = {
-            id: `task-${Date.now()}`,
-            title: data.title,
-            notes: data.notes || '',
-            createdAt: new Date().toISOString(),
-            dueDate: data.dueDate,
-            priority: data.priority,
-            completed: false,
-            rolloverCount: 0
-          };
-          mockTasks.push(newTask);
-          notifyListeners();
-          return Promise.resolve({});
-        }, 
-        isPending: false 
-      })
+      useMutation: (options?: any) => {
+        let isPending = false;
+        
+        return {
+          mutate: (data: any) => {
+            if (isPending) return;
+            isPending = true;
+            
+            console.log('Creating task:', data);
+            const newTask: Task = {
+              id: `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              title: data.title,
+              notes: data.notes || '',
+              createdAt: new Date().toISOString(),
+              dueDate: data.dueDate,
+              priority: data.priority,
+              completed: false,
+              rolloverCount: 0
+            };
+            mockTasks.push(newTask);
+            notifyListeners();
+            
+            // Call onSuccess callback
+            if (options?.onSuccess) {
+              options.onSuccess();
+            }
+            
+            isPending = false;
+            return Promise.resolve();
+          }, 
+          mutateAsync: (data: any) => {
+            if (isPending) return Promise.resolve({});
+            isPending = true;
+            
+            console.log('Creating task async:', data);
+            const newTask: Task = {
+              id: `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              title: data.title,
+              notes: data.notes || '',
+              createdAt: new Date().toISOString(),
+              dueDate: data.dueDate,
+              priority: data.priority,
+              completed: false,
+              rolloverCount: 0
+            };
+            mockTasks.push(newTask);
+            notifyListeners();
+            
+            isPending = false;
+            return Promise.resolve({});
+          }, 
+          isPending: isPending
+        };
+      }
     },
     update: {
       useMutation: (_options?: any) => ({
@@ -147,26 +170,54 @@ export const trpc = {
       })
     },
     delete: {
-      useMutation: (_options?: any) => ({ 
-        mutate: (data: any) => {
-          console.log('Deleting task:', data);
-          mockTasks = mockTasks.filter(t => t.id !== data.id);
-          notifyListeners();
-          return Promise.resolve();
-        },
-        isPending: false
-      })
+      useMutation: (options?: any) => {
+        let isPending = false;
+        
+        return {
+          mutate: (data: any) => {
+            if (isPending) return;
+            isPending = true;
+            
+            console.log('Deleting task:', data);
+            mockTasks = mockTasks.filter(t => t.id !== data.id);
+            notifyListeners();
+            
+            // Call onSuccess callback
+            if (options?.onSuccess) {
+              options.onSuccess();
+            }
+            
+            isPending = false;
+            return Promise.resolve();
+          },
+          isPending: isPending
+        };
+      }
     },
     deleteAll: {
-      useMutation: (_options?: any) => ({
-        mutate: () => {
-          console.log('Deleting all tasks');
-          mockTasks = [];
-          notifyListeners();
-          return Promise.resolve();
-        },
-        isPending: false
-      })
+      useMutation: (options?: any) => {
+        let isPending = false;
+        
+        return {
+          mutate: () => {
+            if (isPending) return;
+            isPending = true;
+            
+            console.log('Deleting all tasks');
+            mockTasks = [];
+            notifyListeners();
+            
+            // Call onSuccess callback
+            if (options?.onSuccess) {
+              options.onSuccess();
+            }
+            
+            isPending = false;
+            return Promise.resolve();
+          },
+          isPending: isPending
+        };
+      }
     },
     rollover: {
       useMutation: (_options?: any) => ({ 
