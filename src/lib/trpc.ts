@@ -25,63 +25,41 @@ const triggerStateChange = () => {
   }));
 };
 
-// Mock state storage
-let mockTasks: Task[] = [
-  {
-    id: 'demo-1',
-    title: 'Hoàn thành báo cáo tháng 12',
-    notes: 'Báo cáo tài chính và kế hoạch năm 2024',
-    createdAt: new Date().toISOString(),
-    dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // Tomorrow
-    priority: 'UI' as const,
-    completed: false,
-    rolloverCount: 0
-  },
-  {
-    id: 'demo-2',
-    title: 'Lập kế hoạch marketing Q1',
-    notes: 'Chiến lược marketing cho quý 1 năm 2024',
-    createdAt: new Date().toISOString(),
-    dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // Next week
-    priority: 'UNI' as const,
-    completed: false,
-    rolloverCount: 0
-  },
-  {
-    id: 'demo-3',
-    title: 'Trả lời email khách hàng',
-    notes: 'Phản hồi các câu hỏi từ khách hàng',
-    createdAt: new Date().toISOString(),
-    dueDate: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(), // 2 hours from now
-    priority: 'NUI' as const,
-    completed: false,
-    rolloverCount: 0
-  },
-  {
-    id: 'demo-4',
-    title: 'Dọn dẹp email cũ',
-    notes: 'Xóa các email không cần thiết',
-    createdAt: new Date().toISOString(),
-    priority: 'NUNI' as const,
-    completed: true,
-    completedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
-    rolloverCount: 0
-  }
-];
+// Mock state storage - EMPTY INITIALLY
+let mockTasks: Task[] = [];
+let mockReminders: Reminder[] = [];
 
-let mockReminders: Reminder[] = [
+// Mock user interface
+interface MockUser {
+  id: string;
+  name: string;
+  email: string;
+  passwordHash: string;
+  role: 'user' | 'admin';
+  status: 'active' | 'inactive';
+  joinedAt: string;
+}
+
+// Mock users storage
+let mockUsers: MockUser[] = [
   {
-    id: 'reminder-1',
-    taskId: 'demo-1',
-    reminderTime: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(), // 2 hours from now
-    email: 'demo@example.com'
+    id: 'user-1',
+    name: 'Admin User',
+    email: 'admin@example.com',
+    passwordHash: 'password123', // For demo purposes, not secure
+    role: 'admin',
+    status: 'active',
+    joinedAt: new Date().toISOString(),
   },
   {
-    id: 'reminder-2',
-    taskId: 'demo-2',
-    reminderTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // Tomorrow
-    email: 'demo@example.com'
-  }
+    id: 'user-2',
+    name: 'Demo User',
+    email: 'demo@example.com',
+    passwordHash: 'password123', // For demo purposes, not secure
+    role: 'user',
+    status: 'active',
+    joinedAt: new Date().toISOString(),
+  },
 ];
 
 // Mock tRPC for now - in a real app you'd use actual tRPC
@@ -93,6 +71,74 @@ export const trpc = {
         mutateAsync: async (_data: any) => ({ accessToken: '' }),
         isPending: false,
       })
+    },
+    // Mock auth mutations
+    login: {
+      useMutation: (options?: any) => {
+        let isPending = false;
+        return {
+          mutate: (data: { email: string; password: string }) => {
+            if (isPending) return;
+            isPending = true;
+
+            console.log('Mock login attempt:', data);
+            const user = mockUsers.find(u => u.email === data.email && u.passwordHash === data.password);
+            
+            if (user) {
+              console.log('Mock login success for:', user.email);
+              if (options?.onSuccess) {
+                options.onSuccess(user);
+              }
+            } else {
+              console.log('Mock login failed for:', data.email);
+              if (options?.onError) {
+                options.onError(new Error('Invalid credentials'));
+              }
+            }
+            isPending = false;
+            return Promise.resolve();
+          },
+          isPending: isPending
+        };
+      }
+    },
+    register: {
+      useMutation: (options?: any) => {
+        let isPending = false;
+        return {
+          mutate: (data: { name: string; email: string; password: string }) => {
+            if (isPending) return;
+            isPending = true;
+
+            console.log('Mock register attempt:', data);
+            const existingUser = mockUsers.find(u => u.email === data.email);
+            if (existingUser) {
+              console.log('Mock register failed: User already exists', data.email);
+              if (options?.onError) {
+                options.onError(new Error('User with this email already exists'));
+              }
+            } else {
+              const newUser: MockUser = {
+                id: `user-${Date.now()}`,
+                name: data.name,
+                email: data.email,
+                passwordHash: data.password, // For demo purposes, not secure
+                role: 'user',
+                status: 'active',
+                joinedAt: new Date().toISOString(),
+              };
+              mockUsers.push(newUser);
+              console.log('Mock register success for:', newUser.email);
+              if (options?.onSuccess) {
+                options.onSuccess(newUser);
+              }
+            }
+            isPending = false;
+            return Promise.resolve();
+          },
+          isPending: isPending
+        };
+      }
     }
   },
   tasks: {

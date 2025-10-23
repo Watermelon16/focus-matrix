@@ -2,7 +2,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { APP_TITLE } from "@/const";
-import { GoogleLogin } from '@react-oauth/google';
 import { trpc } from "@/lib/trpc";
 import { EisenhowerMatrix } from "./EisenhowerMatrix";
 import { AddTaskDialog } from "./AddTaskDialog";
@@ -13,7 +12,7 @@ import { SmartDashboard } from "./SmartDashboard";
 import { EditReminderDialog } from "./EditReminderDialog";
 import { LoginDialog } from "./LoginDialog";
 import { AdminDashboard } from "./AdminDashboard";
-import { Loader2, LogOut, Trash2, BarChart3, Grid3X3, Users } from "lucide-react";
+import { Loader2, LogOut, Trash2, BarChart3, Grid3X3, Users, FileText, RotateCcw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { getNow } from "@/lib/date";
 import { useEffect, useState } from "react";
@@ -21,7 +20,7 @@ import { toast } from "sonner";
 import { useTrpcState } from "@/hooks/useTrpcState";
 
 export default function Home() {
-  const { user, loading, isAuthenticated, logout, login } = useAuth();
+  const { user, loading, isAuthenticated, logout } = useAuth();
   const [view, setView] = useState<'matrix' | 'dashboard' | 'admin'>('matrix');
   const refreshKey = useTrpcState(); // Real-time state management
   
@@ -96,48 +95,6 @@ export default function Home() {
           </div>
                   <div className="w-full space-y-3">
                     <LoginDialog />
-                    
-                    {/* Google Login vẫn có sẵn */}
-                    <GoogleLogin
-                      onSuccess={(credentialResponse) => {
-                        console.log('Google login success:', credentialResponse);
-                        // Decode JWT token to get user info
-                        try {
-                          if (!credentialResponse.credential) {
-                            throw new Error('No credential provided');
-                          }
-                          const payload = JSON.parse(atob(credentialResponse.credential.split('.')[1]));
-                          const googleUser = {
-                            id: payload.sub || 'google-user',
-                            name: payload.name || 'Google User',
-                            email: payload.email || 'google.user@example.com'
-                          };
-                          console.log('Calling login with Google user:', googleUser);
-                          login(googleUser);
-                          toast.success(`Đăng nhập Google thành công! Xin chào ${googleUser.name}`);
-                        } catch (error) {
-                          console.error('Error decoding Google token:', error);
-                          // Fallback to mock user
-                          const demoUser = {
-                            id: 'demo-user',
-                            name: 'Google User',
-                            email: 'google.user@example.com'
-                          };
-                          login(demoUser);
-                          toast.success("Đăng nhập Google thành công!");
-                        }
-                      }}
-                      onError={() => {
-                        console.error('Google login failed');
-                        toast.error("Đăng nhập Google thất bại.");
-                      }}
-                      useOneTap
-                      theme="outline"
-                      size="large"
-                      text="signin_with"
-                      shape="rectangular"
-                      width="100%"
-                    />
                   </div>
           <p className="text-xs text-muted-foreground">
             ✅ Offline-first • 🔒 Mã hóa E2EE • ☁️ Sync Google Drive
@@ -200,8 +157,6 @@ export default function Home() {
                       <Users className="mr-2 h-4 w-4" />
                       Quản trị
                     </Button>
-            <IcsImporter onSuccess={forceRefresh} />
-            <AddTaskDialog onSuccess={forceRefresh} />
             <UserProfile onRefresh={forceRefresh} />
             {/* Team settings - requires Google access token, for demo we render button and ask for login first */}
             <TeamSettings accessToken={(window as any).__googleAccessToken || ''} />
@@ -214,6 +169,40 @@ export default function Home() {
       </header>
 
       <main className="container mx-auto px-4 py-6">
+        {/* Quick Actions Section */}
+        <div className="mb-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Hành động nhanh</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <AddTaskDialog onSuccess={forceRefresh} />
+                <IcsImporter onSuccess={forceRefresh} />
+                <Button
+                  variant="outline"
+                  onClick={() => setView('dashboard')}
+                  className="h-20 flex flex-col items-center justify-center gap-2"
+                >
+                  <FileText className="h-6 w-6" />
+                  <span className="text-sm">Xem báo cáo</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    rollover.mutate({ now: new Date().toISOString() });
+                    toast.success("Đã thực hiện rollover");
+                  }}
+                  className="h-20 flex flex-col items-center justify-center gap-2"
+                >
+                  <RotateCcw className="h-6 w-6" />
+                  <span className="text-sm">Rollover</span>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         {view === 'matrix' ? (
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             {/* Ma trận Eisenhower - 3 columns */}

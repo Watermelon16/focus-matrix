@@ -13,7 +13,8 @@ import {
 } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { LogIn, UserPlus } from "lucide-react";
+import { LogIn, UserPlus, Loader2 } from "lucide-react";
+import { trpc } from "@/lib/trpc";
 
 export function LoginDialog() {
   const { login } = useAuth();
@@ -24,58 +25,61 @@ export function LoginDialog() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const loginMutation = trpc.auth.login.useMutation({
+    onSuccess: (userData: any) => {
+      login({ id: userData.id, name: userData.name, email: userData.email });
+      toast.success(`Đăng nhập thành công! Xin chào ${userData.name}`);
+      setLoading(false);
+    },
+    onError: (error: any) => {
+      toast.error(`Đăng nhập thất bại: ${error.message}`);
+      setLoading(false);
+    },
+  });
+
+  const registerMutation = trpc.auth.register.useMutation({
+    onSuccess: (userData: any) => {
+      login({ id: userData.id, name: userData.name, email: userData.email });
+      toast.success(`Đăng ký thành công! Xin chào ${userData.name}`);
+      setLoading(false);
+    },
+    onError: (error: any) => {
+      toast.error(`Đăng ký thất bại: ${error.message}`);
+      setLoading(false);
+    },
+  });
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    try {
-      if (isLogin) {
-        // Đăng nhập
-        if (!email || !password) {
-          toast.error("Vui lòng nhập đầy đủ thông tin");
-          return;
-        }
-        
-        // Mock login - trong thực tế sẽ gọi API
-        const user = {
-          id: `user-${Date.now()}`,
-          name: email.split('@')[0], // Lấy tên từ email
-          email: email
-        };
-        
-        login(user);
-        toast.success("Đăng nhập thành công!");
-      } else {
-        // Đăng ký
-        if (!email || !password || !name) {
-          toast.error("Vui lòng nhập đầy đủ thông tin");
-          return;
-        }
-        
-        if (password !== confirmPassword) {
-          toast.error("Mật khẩu xác nhận không khớp");
-          return;
-        }
-        
-        if (password.length < 6) {
-          toast.error("Mật khẩu phải có ít nhất 6 ký tự");
-          return;
-        }
-        
-        // Mock register - trong thực tế sẽ gọi API
-        const user = {
-          id: `user-${Date.now()}`,
-          name: name,
-          email: email
-        };
-        
-        login(user);
-        toast.success("Đăng ký thành công!");
+    if (isLogin) {
+      if (!email || !password) {
+        toast.error("Vui lòng nhập đầy đủ thông tin");
+        setLoading(false);
+        return;
       }
-    } catch (error) {
-      toast.error("Có lỗi xảy ra, vui lòng thử lại");
-    } finally {
-      setLoading(false);
+      loginMutation.mutate({ email, password });
+    } else {
+      if (!email || !password || !name) {
+        toast.error("Vui lòng nhập đầy đủ thông tin");
+        setLoading(false);
+        return;
+      }
+      
+      if (password !== confirmPassword) {
+        toast.error("Mật khẩu xác nhận không khớp");
+        setLoading(false);
+        return;
+      }
+      
+      if (password.length < 6) {
+        toast.error("Mật khẩu phải có ít nhất 6 ký tự");
+        setLoading(false);
+        return;
+      }
+      
+      registerMutation.mutate({ name, email, password });
     }
   };
 
@@ -155,7 +159,17 @@ export function LoginDialog() {
           
           <DialogFooter className="flex-col gap-2">
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Đang xử lý..." : (isLogin ? "Đăng nhập" : "Đăng ký")}
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Đang xử lý...
+                </>
+              ) : (
+                <>
+                  {isLogin ? <LogIn className="mr-2 h-4 w-4" /> : <UserPlus className="mr-2 h-4 w-4" />}
+                  {isLogin ? "Đăng nhập" : "Đăng ký"}
+                </>
+              )}
             </Button>
             
             <Button
