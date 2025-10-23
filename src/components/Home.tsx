@@ -18,7 +18,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 export default function Home() {
-  const { user, loading, isAuthenticated, logout } = useAuth();
+  const { user, loading, isAuthenticated, logout, login } = useAuth();
   const [view, setView] = useState<'matrix' | 'dashboard'>('matrix');
   const { data: tasks, isLoading: tasksLoading, refetch } = trpc.tasks.list.useQuery();
   
@@ -83,8 +83,14 @@ export default function Home() {
             <GoogleLogin
               onSuccess={(credentialResponse) => {
                 console.log('Google login success:', credentialResponse);
-                // In a real app, you'd send this credential to your backend
-                // For now, we'll just show a success message
+                // Mock user for demo
+                const demoUser = {
+                  id: credentialResponse.credential || 'demo-user',
+                  name: 'Google User',
+                  email: 'google.user@example.com'
+                };
+                // Call login function to update auth state
+                login(demoUser);
                 toast.success("Đăng nhập Google thành công!");
               }}
               onError={() => {
