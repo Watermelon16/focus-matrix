@@ -227,31 +227,6 @@ export function UserProfile() {
             </CardContent>
           </Card>
 
-          {/* Thông tin tài khoản */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Mail className="h-4 w-4" />
-                Thông tin tài khoản
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">ID người dùng:</span>
-                  <span className="font-mono">{user?.id}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Trạng thái:</span>
-                  <span className="text-green-600">Đang hoạt động</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Tham gia:</span>
-                  <span>Hôm nay</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
 
           {/* Reset toàn bộ */}
           <Card className="border-red-200">
