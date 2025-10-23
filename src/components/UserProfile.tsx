@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { trpc } from "@/lib/trpc";
-import { User, Settings, Lock, Mail, Trash2, AlertTriangle, Users, Link as LinkIcon } from "lucide-react";
+import { User, Settings, Lock, Trash2, AlertTriangle, Users, Link as LinkIcon } from "lucide-react";
 import { GoogleLogin } from '@react-oauth/google';
 import { useState } from "react";
 import { toast } from "sonner";
