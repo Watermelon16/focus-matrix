@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { trpc } from "@/lib/trpc";
-import { User, Settings, Lock, Trash2, AlertTriangle } from "lucide-react";
+import { User, Settings, Lock, Trash2, AlertTriangle, Cloud } from "lucide-react";
 import { createOrUpdateJsonFile, readJsonFile, datasetToBase64, base64ToDataset } from "@/lib/drive";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -32,6 +32,7 @@ export function UserProfile({ onRefresh }: UserProfileProps) {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [driveFileId, setDriveFileId] = useState<string | null>(localStorage.getItem('drive_file_id') || null);
+  const [isGoogleConnected, setIsGoogleConnected] = useState(false);
 
   const deleteAllTasks = trpc.tasks.deleteAll.useMutation({
     onSuccess: () => {
@@ -53,6 +54,15 @@ export function UserProfile({ onRefresh }: UserProfileProps) {
     // In production, implement OAuth Code flow to get access token
     const token = (window as any).__googleAccessToken as string | undefined;
     return token || null;
+  };
+
+  const handleConnectGoogle = () => {
+    // For demo, simulate Google connection
+    // In production, implement proper OAuth flow
+    const mockToken = 'demo-google-token-' + Date.now();
+    (window as any).__googleAccessToken = mockToken;
+    setIsGoogleConnected(true);
+    toast.success("Đã kết nối Google thành công");
   };
 
   const handleBackupToDrive = async () => {
@@ -206,25 +216,42 @@ export function UserProfile({ onRefresh }: UserProfileProps) {
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
+              <Cloud className="h-4 w-4" />
               Sao lưu & Khôi phục (Google Drive)
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={handleBackupToDrive}>
-                Sao lưu lên Drive
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleRestoreFromDrive} disabled={!driveFileId}>
-                Khôi phục từ Drive
-              </Button>
-            </div>
-            {!driveFileId ? (
-              <p className="text-xs text-muted-foreground">Chưa có file sao lưu. Hãy bấm "Sao lưu lên Drive".</p>
+          <CardContent className="space-y-3">
+            {!isGoogleConnected ? (
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Cần kết nối Google để sao lưu dữ liệu</p>
+                <Button variant="outline" size="sm" onClick={handleConnectGoogle}>
+                  <Cloud className="mr-2 h-4 w-4" />
+                  Kết nối Google
+                </Button>
+              </div>
             ) : (
-              <p className="text-xs text-muted-foreground">Đã liên kết file: {driveFileId}</p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm text-green-600">
+                  <Cloud className="h-4 w-4" />
+                  Đã kết nối Google
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" size="sm" onClick={handleBackupToDrive}>
+                    Sao lưu lên Drive
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleRestoreFromDrive} disabled={!driveFileId}>
+                    Khôi phục từ Drive
+                  </Button>
+                </div>
+                {!driveFileId ? (
+                  <p className="text-xs text-muted-foreground">Chưa có file sao lưu. Hãy bấm "Sao lưu lên Drive".</p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Đã liên kết file: {driveFileId}</p>
+                )}
+              </div>
             )}
             <p className="text-xs text-muted-foreground">
-              Lưu ý: Cần đăng nhập Google One Tap để cấp quyền tạm thời. Phiên bản này chỉ là demo client-side.
+              Lưu ý: Phiên bản demo sử dụng token giả lập. Production sẽ dùng OAuth thực tế.
             </p>
           </CardContent>
         </Card>
