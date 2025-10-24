@@ -4,7 +4,7 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [react()],
-  base: process.env.NODE_ENV === 'production' ? '/focus-matrix/' : '/',
+  base: '/focus-matrix/',
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -15,4 +15,3 @@ export default defineConfig({
     port: 3000,
   },
 });
-
