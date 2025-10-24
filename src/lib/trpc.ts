@@ -1,4 +1,5 @@
 import type { Task, Reminder } from '@/types';
+import { userService, taskService, reminderService } from './firebaseService';
 
 // Event system for notifying components of state changes
 let listeners: (() => void)[] = [];
@@ -25,96 +26,9 @@ const triggerStateChange = () => {
   }));
 };
 
-// Load data from localStorage or initialize
-const loadMockUsers = (): MockUser[] => {
-  try {
-    const saved = localStorage.getItem('focus_matrix_users');
-    if (saved) {
-      return JSON.parse(saved);
-    }
-  } catch (e) {
-    console.error('Error loading users:', e);
-  }
-  // Default admin user
-  return [
-    {
-      id: 'user-1',
-      name: 'Phuong Admin',
-      email: 'phuonglh43@gmail.com',
-      passwordHash: '010486', // Admin password
-      role: 'admin',
-      status: 'active',
-      joinedAt: new Date().toISOString(),
-    }
-  ];
-};
+// Firebase user interface (imported from firebaseService)
 
-const loadMockTasks = (): Record<string, Task[]> => {
-  try {
-    const saved = localStorage.getItem('focus_matrix_tasks');
-    if (saved) {
-      return JSON.parse(saved);
-    }
-  } catch (e) {
-    console.error('Error loading tasks:', e);
-  }
-  return {};
-};
-
-const loadMockReminders = (): Record<string, Reminder[]> => {
-  try {
-    const saved = localStorage.getItem('focus_matrix_reminders');
-    if (saved) {
-      return JSON.parse(saved);
-    }
-  } catch (e) {
-    console.error('Error loading reminders:', e);
-  }
-  return {};
-};
-
-// Save data to localStorage
-const saveMockUsers = () => {
-  try {
-    localStorage.setItem('focus_matrix_users', JSON.stringify(mockUsers));
-  } catch (e) {
-    console.error('Error saving users:', e);
-  }
-};
-
-const saveMockTasks = () => {
-  try {
-    localStorage.setItem('focus_matrix_tasks', JSON.stringify(mockTasks));
-  } catch (e) {
-    console.error('Error saving tasks:', e);
-  }
-};
-
-const saveMockReminders = () => {
-  try {
-    localStorage.setItem('focus_matrix_reminders', JSON.stringify(mockReminders));
-  } catch (e) {
-    console.error('Error saving reminders:', e);
-  }
-};
-
-// Mock user interface
-interface MockUser {
-  id: string;
-  name: string;
-  email: string;
-  passwordHash: string;
-  role: 'user' | 'admin';
-  status: 'active' | 'inactive';
-  joinedAt: string;
-}
-
-// Mock state storage - PER USER (loaded from localStorage)
-let mockUsers: MockUser[] = loadMockUsers();
-let mockTasks: Record<string, Task[]> = loadMockTasks();
-let mockReminders: Record<string, Reminder[]> = loadMockReminders();
-
-// Mock tRPC for now - in a real app you'd use actual tRPC
+// Firebase-powered tRPC
 export const trpc = {
   auth: {
     // Placeholder for future backend; currently front-end only
@@ -124,31 +38,38 @@ export const trpc = {
         isPending: false,
       })
     },
-    // Mock auth mutations
+    // Firebase auth mutations
     login: {
       useMutation: (options?: any) => {
         let isPending = false;
         return {
-          mutate: (data: { email: string; password: string }) => {
+          mutate: async (data: { email: string; password: string }) => {
             if (isPending) return;
             isPending = true;
 
-            console.log('Mock login attempt:', data);
-            const user = mockUsers.find(u => u.email === data.email && u.passwordHash === data.password);
-            
-            if (user) {
-              console.log('Mock login success for:', user.email);
-              if (options?.onSuccess) {
-                options.onSuccess(user);
+            try {
+              console.log('Firebase login attempt:', data);
+              const users = await userService.getAllUsers();
+              const user = users.find(u => u.email === data.email && u.passwordHash === data.password);
+              
+              if (user) {
+                console.log('Firebase login success for:', user.email);
+                if (options?.onSuccess) {
+                  options.onSuccess(user);
+                }
+              } else {
+                console.log('Firebase login failed for:', data.email);
+                if (options?.onError) {
+                  options.onError(new Error('Invalid credentials'));
+                }
               }
-            } else {
-              console.log('Mock login failed for:', data.email);
+            } catch (error) {
+              console.error('Firebase login error:', error);
               if (options?.onError) {
-                options.onError(new Error('Invalid credentials'));
+                options.onError(error);
               }
             }
             isPending = false;
-            return Promise.resolve();
           },
           isPending: isPending
         };
@@ -158,37 +79,45 @@ export const trpc = {
       useMutation: (options?: any) => {
         let isPending = false;
         return {
-          mutate: (data: { name: string; email: string; password: string }) => {
+          mutate: async (data: { name: string; email: string; password: string }) => {
             if (isPending) return;
             isPending = true;
 
-            console.log('Mock register attempt:', data);
-            const existingUser = mockUsers.find(u => u.email === data.email);
-            if (existingUser) {
-              console.log('Mock register failed: User already exists', data.email);
-              if (options?.onError) {
-                options.onError(new Error('User with this email already exists'));
+            try {
+              console.log('Firebase register attempt:', data);
+              const users = await userService.getAllUsers();
+              const existingUser = users.find(u => u.email === data.email);
+              
+              if (existingUser) {
+                console.log('Firebase register failed: User already exists', data.email);
+                if (options?.onError) {
+                  options.onError(new Error('User with this email already exists'));
+                }
+              } else {
+                const newUser = {
+                  name: data.name,
+                  email: data.email,
+                  role: 'user' as const,
+                  status: 'active' as const,
+                  joinedAt: new Date().toISOString(),
+                };
+                
+                const userId = await userService.createUser(newUser);
+                const createdUser = { id: userId, ...newUser };
+                
+                triggerStateChange(); // Trigger refresh for admin dashboard
+                console.log('Firebase register success for:', createdUser.email);
+                if (options?.onSuccess) {
+                  options.onSuccess(createdUser);
+                }
               }
-            } else {
-              const newUser: MockUser = {
-                id: `user-${Date.now()}`,
-                name: data.name,
-                email: data.email,
-                passwordHash: data.password, // For demo purposes, not secure
-                role: 'user',
-                status: 'active',
-                joinedAt: new Date().toISOString(),
-              };
-              mockUsers.push(newUser);
-              saveMockUsers(); // Save to localStorage
-              triggerStateChange(); // Trigger refresh for admin dashboard
-              console.log('Mock register success for:', newUser.email);
-              if (options?.onSuccess) {
-                options.onSuccess(newUser);
+            } catch (error) {
+              console.error('Firebase register error:', error);
+              if (options?.onError) {
+                options.onError(error);
               }
             }
             isPending = false;
-            return Promise.resolve();
           },
           isPending: isPending
         };
@@ -207,15 +136,26 @@ export const trpc = {
         const currentUser = localStorage.getItem('user');
         const userId = currentUser ? JSON.parse(currentUser).id : 'anonymous';
         
+        // Initialize with empty data, will be populated by real-time listener
+        let currentData: Task[] = [];
+        
+        const unsubscribe = taskService.onUserTasksChange(userId, (tasks) => {
+          currentData = tasks;
+          if (options?.onSuccess) {
+            options.onSuccess(tasks);
+          }
+          triggerStateChange();
+        });
+        
         return {
-          data: mockTasks[userId] || [], 
+          data: currentData,
           isLoading: false,
-          // Force refresh by including counter
           refreshCounter,
           refetch: () => {
             triggerStateChange();
             return Promise.resolve();
-          }
+          },
+          unsubscribe // For cleanup
         };
       }
     },
@@ -224,153 +164,172 @@ export const trpc = {
         let isPending = false;
         
         return {
-          mutate: (data: any) => {
+          mutate: async (data: any) => {
             if (isPending) return;
             isPending = true;
             
-            console.log('Creating task:', data);
-            const newTask: Task = {
-              id: `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              title: data.title,
-              notes: data.notes || '',
-              createdAt: new Date().toISOString(),
-              dueDate: data.dueDate,
-              priority: data.priority,
-              completed: false,
-              rolloverCount: 0,
-              taskType: data.taskType || 'work'
-            };
-            
-            // Get current user ID
-            const currentUser = localStorage.getItem('user');
-            const userId = currentUser ? JSON.parse(currentUser).id : 'anonymous';
-            
-            if (!mockTasks[userId]) mockTasks[userId] = [];
-            mockTasks[userId].push(newTask);
-            saveMockTasks(); // Save to localStorage
-            
-            // Create reminder if provided
-            if (data.reminder && data.reminder.time) {
-              const newReminder: Reminder = {
-                id: `reminder-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                taskId: newTask.id,
-                reminderTime: data.reminder.time,
-                email: data.reminder.email
+            try {
+              console.log('Firebase creating task:', data);
+              
+              // Get current user ID
+              const currentUser = localStorage.getItem('user');
+              const userId = currentUser ? JSON.parse(currentUser).id : 'anonymous';
+              
+              const newTask: Omit<Task, 'id'> & { userId: string } = {
+                title: data.title,
+                notes: data.notes || '',
+                createdAt: new Date().toISOString(),
+                dueDate: data.dueDate,
+                priority: data.priority,
+                completed: false,
+                rolloverCount: 0,
+                taskType: data.taskType || 'work',
+                userId: userId
               };
               
-              if (!mockReminders[userId]) mockReminders[userId] = [];
-              mockReminders[userId].push(newReminder);
-              saveMockReminders(); // Save to localStorage
-            }
-            
-            triggerStateChange();
-            
-            // Call onSuccess callback
-            if (options?.onSuccess) {
-              options.onSuccess();
+              const taskId = await taskService.createTask(newTask);
+              
+              // Create reminder if provided
+              if (data.reminder && data.reminder.time) {
+                const newReminder: Omit<Reminder, 'id'> & { userId: string } = {
+                  taskId: taskId,
+                  reminderTime: data.reminder.time,
+                  email: data.reminder.email,
+                  userId: userId
+                };
+                
+                await reminderService.createReminder(newReminder);
+              }
+              
+              triggerStateChange();
+              
+              // Call onSuccess callback
+              if (options?.onSuccess) {
+                options.onSuccess();
+              }
+            } catch (error) {
+              console.error('Firebase create task error:', error);
+              if (options?.onError) {
+                options.onError(error);
+              }
             }
             
             isPending = false;
-            return Promise.resolve();
           }, 
-          mutateAsync: (data: any) => {
+          mutateAsync: async (data: any) => {
             if (isPending) return Promise.resolve({});
             isPending = true;
             
-            console.log('Creating task async:', data);
-            const newTask: Task = {
-              id: `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              title: data.title,
-              notes: data.notes || '',
-              createdAt: new Date().toISOString(),
-              dueDate: data.dueDate,
-              priority: data.priority,
-              completed: false,
-              rolloverCount: 0,
-              taskType: data.taskType || 'work'
-            };
-            
-            // Get current user ID
-            const currentUser = localStorage.getItem('user');
-            const userId = currentUser ? JSON.parse(currentUser).id : 'anonymous';
-            
-            if (!mockTasks[userId]) mockTasks[userId] = [];
-            mockTasks[userId].push(newTask);
-            saveMockTasks(); // Save to localStorage
-            
-            // Create reminder if provided
-            if (data.reminder && data.reminder.time) {
-              const newReminder: Reminder = {
-                id: `reminder-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                taskId: newTask.id,
-                reminderTime: data.reminder.time,
-                email: data.reminder.email
+            try {
+              console.log('Firebase creating task async:', data);
+              
+              // Get current user ID
+              const currentUser = localStorage.getItem('user');
+              const userId = currentUser ? JSON.parse(currentUser).id : 'anonymous';
+              
+              const newTask: Omit<Task, 'id'> & { userId: string } = {
+                title: data.title,
+                notes: data.notes || '',
+                createdAt: new Date().toISOString(),
+                dueDate: data.dueDate,
+                priority: data.priority,
+                completed: false,
+                rolloverCount: 0,
+                taskType: data.taskType || 'work',
+                userId: userId
               };
               
-              if (!mockReminders[userId]) mockReminders[userId] = [];
-              mockReminders[userId].push(newReminder);
-              saveMockReminders(); // Save to localStorage
+              const taskId = await taskService.createTask(newTask);
+              
+              // Create reminder if provided
+              if (data.reminder && data.reminder.time) {
+                const newReminder: Omit<Reminder, 'id'> & { userId: string } = {
+                  taskId: taskId,
+                  reminderTime: data.reminder.time,
+                  email: data.reminder.email,
+                  userId: userId
+                };
+                
+                await reminderService.createReminder(newReminder);
+              }
+              
+              triggerStateChange();
+              
+              // Call onSuccess callback
+              if (options?.onSuccess) {
+                options.onSuccess();
+              }
+              
+              return Promise.resolve();
+            } catch (error) {
+              console.error('Firebase create task async error:', error);
+              if (options?.onError) {
+                options.onError(error);
+              }
+              return Promise.reject(error);
+            } finally {
+              isPending = false;
             }
-            
-            triggerStateChange();
-            
-            isPending = false;
-            return Promise.resolve({});
-          }, 
+          },
           isPending: isPending
         };
       }
     },
     update: {
-      useMutation: (_options?: any) => ({
-        mutate: (data: any) => {
-          console.log('Updating task:', data);
-          
-          // Get current user ID
-          const currentUser = localStorage.getItem('user');
-          const userId = currentUser ? JSON.parse(currentUser).id : 'anonymous';
-          
-          if (mockTasks[userId]) {
-            const taskIndex = mockTasks[userId].findIndex(t => t.id === data.id);
-            if (taskIndex !== -1) {
-              mockTasks[userId][taskIndex] = { ...mockTasks[userId][taskIndex], ...data };
-              saveMockTasks(); // Save to localStorage
+      useMutation: (options?: any) => {
+        let isPending = false;
+        
+        return {
+          mutate: async (data: { id: string; [key: string]: any }) => {
+            if (isPending) return;
+            isPending = true;
+            
+            try {
+              console.log('Firebase updating task:', data);
+              await taskService.updateTask(data.id, data);
               triggerStateChange();
+              
+              if (options?.onSuccess) {
+                options.onSuccess();
+              }
+            } catch (error) {
+              console.error('Firebase update task error:', error);
+              if (options?.onError) {
+                options.onError(error);
+              }
             }
-          }
-          return Promise.resolve();
-        },
-        isPending: false
-      })
+            
+            isPending = false;
+          },
+          isPending: isPending
+        };
+      }
     },
     delete: {
       useMutation: (options?: any) => {
         let isPending = false;
         
         return {
-          mutate: (data: any) => {
+          mutate: async (data: { id: string }) => {
             if (isPending) return;
             isPending = true;
             
-            console.log('Deleting task:', data);
-            
-            // Get current user ID
-            const currentUser = localStorage.getItem('user');
-            const userId = currentUser ? JSON.parse(currentUser).id : 'anonymous';
-            
-            if (mockTasks[userId]) {
-              mockTasks[userId] = mockTasks[userId].filter(t => t.id !== data.id);
-              saveMockTasks(); // Save to localStorage
+            try {
+              console.log('Firebase deleting task:', data);
+              await taskService.deleteTask(data.id);
               triggerStateChange();
-            }
-            
-            // Call onSuccess callback
-            if (options?.onSuccess) {
-              options.onSuccess();
+              
+              if (options?.onSuccess) {
+                options.onSuccess();
+              }
+            } catch (error) {
+              console.error('Firebase delete task error:', error);
+              if (options?.onError) {
+                options.onError(error);
+              }
             }
             
             isPending = false;
-            return Promise.resolve();
           },
           isPending: isPending
         };
@@ -381,140 +340,234 @@ export const trpc = {
         let isPending = false;
         
         return {
-          mutate: () => {
+          mutate: async () => {
             if (isPending) return;
             isPending = true;
             
-            console.log('Deleting all tasks');
-            
-            // Get current user ID
-            const currentUser = localStorage.getItem('user');
-            const userId = currentUser ? JSON.parse(currentUser).id : 'anonymous';
-            
-            mockTasks[userId] = [];
-            saveMockTasks(); // Save to localStorage
-            triggerStateChange();
-            
-            // Call onSuccess callback
-            if (options?.onSuccess) {
-              options.onSuccess();
+            try {
+              console.log('Firebase deleting all tasks');
+              const currentUser = localStorage.getItem('user');
+              const userId = currentUser ? JSON.parse(currentUser).id : 'anonymous';
+              
+              await taskService.deleteAllUserTasks(userId);
+              await reminderService.deleteAllUserReminders(userId);
+              triggerStateChange();
+              
+              if (options?.onSuccess) {
+                options.onSuccess();
+              }
+            } catch (error) {
+              console.error('Firebase delete all tasks error:', error);
+              if (options?.onError) {
+                options.onError(error);
+              }
             }
             
             isPending = false;
-            return Promise.resolve();
           },
           isPending: isPending
         };
       }
     },
-    // Replace all tasks (used by Drive restore)
     replaceAll: {
-      useMutation: (_options?: any) => ({
-        mutate: (data: { tasks: Task[] }) => {
-          // Get current user ID
-          const currentUser = localStorage.getItem('user');
-          const userId = currentUser ? JSON.parse(currentUser).id : 'anonymous';
-          
-          mockTasks[userId] = Array.isArray(data.tasks) ? [...data.tasks] : [];
-          saveMockTasks(); // Save to localStorage
-          triggerStateChange();
-          return Promise.resolve();
-        },
-        isPending: false 
-      })
-    },
-    rollover: {
-      useMutation: (_options?: any) => ({ 
-        mutate: (_data: any) => {
-          console.log('Rollover tasks:', _data);
-          return Promise.resolve({ processed: 0 });
-        }, 
-        isPending: false 
-      })
+      useMutation: (options?: any) => {
+        let isPending = false;
+        
+        return {
+          mutate: async (data: { tasks: Task[] }) => {
+            if (isPending) return;
+            isPending = true;
+            
+            try {
+              console.log('Firebase replacing all tasks:', data);
+              const currentUser = localStorage.getItem('user');
+              const userId = currentUser ? JSON.parse(currentUser).id : 'anonymous';
+              
+              await taskService.replaceUserTasks(userId, data.tasks);
+              triggerStateChange();
+              
+              if (options?.onSuccess) {
+                options.onSuccess();
+              }
+            } catch (error) {
+              console.error('Firebase replace all tasks error:', error);
+              if (options?.onError) {
+                options.onError(error);
+              }
+            }
+            
+            isPending = false;
+          },
+          isPending: isPending
+        };
+      }
     }
   },
   reminders: {
     list: {
-      useQuery: (_options?: any) => {
-        // Get current user ID
+      useQuery: (options?: any) => {
+        // Add listener for state changes
+        if (options?.onSuccess) {
+          listeners.push(options.onSuccess);
+        }
+        
+        // Get current user ID from localStorage
         const currentUser = localStorage.getItem('user');
         const userId = currentUser ? JSON.parse(currentUser).id : 'anonymous';
         
+        // Initialize with empty data, will be populated by real-time listener
+        let currentData: Reminder[] = [];
+        
+        const unsubscribe = reminderService.onUserRemindersChange(userId, (reminders) => {
+          currentData = reminders;
+          if (options?.onSuccess) {
+            options.onSuccess(reminders);
+          }
+          triggerStateChange();
+        });
+        
         return {
-          data: mockReminders[userId] || [],
+          data: currentData,
           isLoading: false,
-          refetch: () => Promise.resolve()
+          refetch: () => Promise.resolve(),
+          unsubscribe // For cleanup
         };
       }
     },
     create: {
-      useMutation: (_options?: any) => ({ 
-        mutate: (_data: any) => {
-          console.log('Creating reminder:', _data);
-          return Promise.resolve();
-        }, 
-        isPending: false 
-      })
+      useMutation: (options?: any) => {
+        let isPending = false;
+        
+        return {
+          mutate: async (data: any) => {
+            if (isPending) return;
+            isPending = true;
+            
+            try {
+              console.log('Firebase creating reminder:', data);
+              const currentUser = localStorage.getItem('user');
+              const userId = currentUser ? JSON.parse(currentUser).id : 'anonymous';
+              
+              const newReminder: Omit<Reminder, 'id'> & { userId: string } = {
+                taskId: data.taskId,
+                reminderTime: data.reminderTime,
+                email: data.email,
+                userId: userId
+              };
+              
+              await reminderService.createReminder(newReminder);
+              triggerStateChange();
+              
+              if (options?.onSuccess) {
+                options.onSuccess();
+              }
+            } catch (error) {
+              console.error('Firebase create reminder error:', error);
+              if (options?.onError) {
+                options.onError(error);
+              }
+            }
+            
+            isPending = false;
+          },
+          isPending: isPending
+        };
+      }
     },
     update: {
-      useMutation: (_options?: any) => ({ 
-        mutate: (_data: any) => {
-          console.log('Updating reminder:', _data);
-          return Promise.resolve();
-        }, 
-        isPending: false 
-      })
+      useMutation: (options?: any) => {
+        let isPending = false;
+        
+        return {
+          mutate: async (data: { id: string; [key: string]: any }) => {
+            if (isPending) return;
+            isPending = true;
+            
+            try {
+              console.log('Firebase updating reminder:', data);
+              await reminderService.updateReminder(data.id, data);
+              triggerStateChange();
+              
+              if (options?.onSuccess) {
+                options.onSuccess();
+              }
+            } catch (error) {
+              console.error('Firebase update reminder error:', error);
+              if (options?.onError) {
+                options.onError(error);
+              }
+            }
+            
+            isPending = false;
+          },
+          isPending: isPending
+        };
+      }
     },
     delete: {
       useMutation: (options?: any) => {
         let isPending = false;
         
         return {
-          mutate: (data: any) => {
+          mutate: async (data: { id: string }) => {
             if (isPending) return;
             isPending = true;
             
-            console.log('Deleting reminder:', data);
-            
-            // Get current user ID
-            const currentUser = localStorage.getItem('user');
-            const userId = currentUser ? JSON.parse(currentUser).id : 'anonymous';
-            
-            if (mockReminders[userId]) {
-              mockReminders[userId] = mockReminders[userId].filter(r => r.id !== data.id);
-              saveMockReminders(); // Save to localStorage
+            try {
+              console.log('Firebase deleting reminder:', data);
+              await reminderService.deleteReminder(data.id);
               triggerStateChange();
-            }
-            
-            if (options?.onSuccess) {
-              options.onSuccess();
+              
+              if (options?.onSuccess) {
+                options.onSuccess();
+              }
+            } catch (error) {
+              console.error('Firebase delete reminder error:', error);
+              if (options?.onError) {
+                options.onError(error);
+              }
             }
             
             isPending = false;
-            return Promise.resolve();
           },
           isPending: isPending
         };
       }
     },
-    // Replace all reminders (used by Drive restore)
     replaceAll: {
-      useMutation: (_options?: any) => ({
-        mutate: (data: { reminders: Reminder[] }) => {
-          // Get current user ID
-          const currentUser = localStorage.getItem('user');
-          const userId = currentUser ? JSON.parse(currentUser).id : 'anonymous';
-          
-          mockReminders[userId] = Array.isArray(data.reminders) ? [...data.reminders] : [];
-          saveMockReminders(); // Save to localStorage
-          triggerStateChange();
-          return Promise.resolve();
-        },
-        isPending: false 
-      })
+      useMutation: (options?: any) => {
+        let isPending = false;
+        
+        return {
+          mutate: async (data: { reminders: Reminder[] }) => {
+            if (isPending) return;
+            isPending = true;
+            
+            try {
+              console.log('Firebase replacing all reminders:', data);
+              const currentUser = localStorage.getItem('user');
+              const userId = currentUser ? JSON.parse(currentUser).id : 'anonymous';
+              
+              await reminderService.replaceUserReminders(userId, data.reminders);
+              triggerStateChange();
+              
+              if (options?.onSuccess) {
+                options.onSuccess();
+              }
+            } catch (error) {
+              console.error('Firebase replace all reminders error:', error);
+              if (options?.onError) {
+                options.onError(error);
+              }
+            }
+            
+            isPending = false;
+          },
+          isPending: isPending
+        };
+      }
     }
   },
-  // New mock for user management
   users: {
     list: {
       useQuery: (options?: any) => {
@@ -522,41 +575,51 @@ export const trpc = {
         if (options?.onSuccess) {
           listeners.push(options.onSuccess);
         }
-        return {
-          data: mockUsers,
-          isLoading: false,
-          refreshCounter,
-          refetch: () => {
-            notifyListeners();
-            return Promise.resolve();
+        
+        // Initialize with empty data, will be populated by real-time listener
+        let currentData: any[] = [];
+        
+        const unsubscribe = userService.onUsersChange((users) => {
+          currentData = users;
+          if (options?.onSuccess) {
+            options.onSuccess(users);
           }
+          triggerStateChange();
+        });
+        
+        return {
+          data: currentData,
+          isLoading: false,
+          refetch: () => Promise.resolve(),
+          unsubscribe // For cleanup
         };
       }
     },
     update: {
       useMutation: (options?: any) => {
         let isPending = false;
+        
         return {
-          mutate: (data: { id: string; name?: string; email?: string; role?: 'user' | 'admin'; status?: 'active' | 'inactive' }) => {
+          mutate: async (data: { id: string; [key: string]: any }) => {
             if (isPending) return;
             isPending = true;
-
-            console.log('Updating user:', data);
-            const userIndex = mockUsers.findIndex(u => u.id === data.id);
-            if (userIndex !== -1) {
-              mockUsers[userIndex] = { ...mockUsers[userIndex], ...data };
-              saveMockUsers(); // Save to localStorage
+            
+            try {
+              console.log('Firebase updating user:', data);
+              await userService.updateUser(data.id, data);
               triggerStateChange();
+              
               if (options?.onSuccess) {
                 options.onSuccess();
               }
-            } else {
+            } catch (error) {
+              console.error('Firebase update user error:', error);
               if (options?.onError) {
-                options.onError(new Error('User not found'));
+                options.onError(error);
               }
             }
+            
             isPending = false;
-            return Promise.resolve();
           },
           isPending: isPending
         };
@@ -565,20 +628,28 @@ export const trpc = {
     delete: {
       useMutation: (options?: any) => {
         let isPending = false;
+        
         return {
-          mutate: (data: { id: string }) => {
+          mutate: async (data: { id: string }) => {
             if (isPending) return;
             isPending = true;
-
-            console.log('Deleting user:', data);
-            mockUsers = mockUsers.filter(u => u.id !== data.id);
-            saveMockUsers(); // Save to localStorage
-            triggerStateChange();
-            if (options?.onSuccess) {
-              options.onSuccess();
+            
+            try {
+              console.log('Firebase deleting user:', data);
+              await userService.deleteUser(data.id);
+              triggerStateChange();
+              
+              if (options?.onSuccess) {
+                options.onSuccess();
+              }
+            } catch (error) {
+              console.error('Firebase delete user error:', error);
+              if (options?.onError) {
+                options.onError(error);
+              }
             }
+            
             isPending = false;
-            return Promise.resolve();
           },
           isPending: isPending
         };
