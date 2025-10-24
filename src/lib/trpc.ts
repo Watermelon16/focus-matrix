@@ -25,9 +25,78 @@ const triggerStateChange = () => {
   }));
 };
 
-// Mock state storage - PER USER
-let mockTasks: Record<string, Task[]> = {};
-let mockReminders: Record<string, Reminder[]> = {};
+// Load data from localStorage or initialize
+const loadMockUsers = (): MockUser[] => {
+  try {
+    const saved = localStorage.getItem('focus_matrix_users');
+    if (saved) {
+      return JSON.parse(saved);
+    }
+  } catch (e) {
+    console.error('Error loading users:', e);
+  }
+  // Default admin user
+  return [
+    {
+      id: 'user-1',
+      name: 'Phuong Admin',
+      email: 'phuonglh43@gmail.com',
+      passwordHash: '010486', // Admin password
+      role: 'admin',
+      status: 'active',
+      joinedAt: new Date().toISOString(),
+    }
+  ];
+};
+
+const loadMockTasks = (): Record<string, Task[]> => {
+  try {
+    const saved = localStorage.getItem('focus_matrix_tasks');
+    if (saved) {
+      return JSON.parse(saved);
+    }
+  } catch (e) {
+    console.error('Error loading tasks:', e);
+  }
+  return {};
+};
+
+const loadMockReminders = (): Record<string, Reminder[]> => {
+  try {
+    const saved = localStorage.getItem('focus_matrix_reminders');
+    if (saved) {
+      return JSON.parse(saved);
+    }
+  } catch (e) {
+    console.error('Error loading reminders:', e);
+  }
+  return {};
+};
+
+// Save data to localStorage
+const saveMockUsers = () => {
+  try {
+    localStorage.setItem('focus_matrix_users', JSON.stringify(mockUsers));
+  } catch (e) {
+    console.error('Error saving users:', e);
+  }
+};
+
+const saveMockTasks = () => {
+  try {
+    localStorage.setItem('focus_matrix_tasks', JSON.stringify(mockTasks));
+  } catch (e) {
+    console.error('Error saving tasks:', e);
+  }
+};
+
+const saveMockReminders = () => {
+  try {
+    localStorage.setItem('focus_matrix_reminders', JSON.stringify(mockReminders));
+  } catch (e) {
+    console.error('Error saving reminders:', e);
+  }
+};
 
 // Mock user interface
 interface MockUser {
@@ -40,18 +109,10 @@ interface MockUser {
   joinedAt: string;
 }
 
-// Mock users storage - EMPTY INITIALLY, only real registered users
-let mockUsers: MockUser[] = [
-  {
-    id: 'user-1',
-    name: 'Phuong Admin',
-    email: 'phuonglh43@gmail.com',
-    passwordHash: '010486', // Admin password
-    role: 'admin',
-    status: 'active',
-    joinedAt: new Date().toISOString(),
-  },
-];
+// Mock state storage - PER USER (loaded from localStorage)
+let mockUsers: MockUser[] = loadMockUsers();
+let mockTasks: Record<string, Task[]> = loadMockTasks();
+let mockReminders: Record<string, Reminder[]> = loadMockReminders();
 
 // Mock tRPC for now - in a real app you'd use actual tRPC
 export const trpc = {
@@ -119,6 +180,7 @@ export const trpc = {
                 joinedAt: new Date().toISOString(),
               };
               mockUsers.push(newUser);
+              saveMockUsers(); // Save to localStorage
               triggerStateChange(); // Trigger refresh for admin dashboard
               console.log('Mock register success for:', newUser.email);
               if (options?.onSuccess) {
@@ -185,6 +247,7 @@ export const trpc = {
             
             if (!mockTasks[userId]) mockTasks[userId] = [];
             mockTasks[userId].push(newTask);
+            saveMockTasks(); // Save to localStorage
             
             // Create reminder if provided
             if (data.reminder && data.reminder.time) {
@@ -197,6 +260,7 @@ export const trpc = {
               
               if (!mockReminders[userId]) mockReminders[userId] = [];
               mockReminders[userId].push(newReminder);
+              saveMockReminders(); // Save to localStorage
             }
             
             triggerStateChange();
@@ -232,6 +296,7 @@ export const trpc = {
             
             if (!mockTasks[userId]) mockTasks[userId] = [];
             mockTasks[userId].push(newTask);
+            saveMockTasks(); // Save to localStorage
             
             // Create reminder if provided
             if (data.reminder && data.reminder.time) {
@@ -244,6 +309,7 @@ export const trpc = {
               
               if (!mockReminders[userId]) mockReminders[userId] = [];
               mockReminders[userId].push(newReminder);
+              saveMockReminders(); // Save to localStorage
             }
             
             triggerStateChange();
@@ -268,6 +334,7 @@ export const trpc = {
             const taskIndex = mockTasks[userId].findIndex(t => t.id === data.id);
             if (taskIndex !== -1) {
               mockTasks[userId][taskIndex] = { ...mockTasks[userId][taskIndex], ...data };
+              saveMockTasks(); // Save to localStorage
               triggerStateChange();
             }
           }
@@ -293,6 +360,7 @@ export const trpc = {
             
             if (mockTasks[userId]) {
               mockTasks[userId] = mockTasks[userId].filter(t => t.id !== data.id);
+              saveMockTasks(); // Save to localStorage
               triggerStateChange();
             }
             
@@ -324,6 +392,7 @@ export const trpc = {
             const userId = currentUser ? JSON.parse(currentUser).id : 'anonymous';
             
             mockTasks[userId] = [];
+            saveMockTasks(); // Save to localStorage
             triggerStateChange();
             
             // Call onSuccess callback
@@ -347,6 +416,7 @@ export const trpc = {
           const userId = currentUser ? JSON.parse(currentUser).id : 'anonymous';
           
           mockTasks[userId] = Array.isArray(data.tasks) ? [...data.tasks] : [];
+          saveMockTasks(); // Save to localStorage
           triggerStateChange();
           return Promise.resolve();
         },
@@ -412,6 +482,7 @@ export const trpc = {
             
             if (mockReminders[userId]) {
               mockReminders[userId] = mockReminders[userId].filter(r => r.id !== data.id);
+              saveMockReminders(); // Save to localStorage
               triggerStateChange();
             }
             
@@ -435,6 +506,7 @@ export const trpc = {
           const userId = currentUser ? JSON.parse(currentUser).id : 'anonymous';
           
           mockReminders[userId] = Array.isArray(data.reminders) ? [...data.reminders] : [];
+          saveMockReminders(); // Save to localStorage
           triggerStateChange();
           return Promise.resolve();
         },
@@ -473,6 +545,7 @@ export const trpc = {
             const userIndex = mockUsers.findIndex(u => u.id === data.id);
             if (userIndex !== -1) {
               mockUsers[userIndex] = { ...mockUsers[userIndex], ...data };
+              saveMockUsers(); // Save to localStorage
               triggerStateChange();
               if (options?.onSuccess) {
                 options.onSuccess();
@@ -499,6 +572,7 @@ export const trpc = {
 
             console.log('Deleting user:', data);
             mockUsers = mockUsers.filter(u => u.id !== data.id);
+            saveMockUsers(); // Save to localStorage
             triggerStateChange();
             if (options?.onSuccess) {
               options.onSuccess();

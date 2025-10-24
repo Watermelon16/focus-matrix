@@ -33,11 +33,14 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
-// import { useTrpcState } from "@/hooks/useTrpcState";
+import { useTrpcState } from "@/hooks/useTrpcState";
 
 // Use real data from trpc
 
 export function AdminDashboard() {
+  // Force re-render when data changes
+  useTrpcState();
+  
   const { data: users = [] } = trpc.users.list.useQuery();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterRole, setFilterRole] = useState("all");
