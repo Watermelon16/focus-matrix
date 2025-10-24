@@ -25,9 +25,9 @@ const triggerStateChange = () => {
   }));
 };
 
-// Mock state storage - EMPTY INITIALLY
-let mockTasks: Task[] = [];
-let mockReminders: Reminder[] = [];
+// Mock state storage - PER USER
+let mockTasks: Record<string, Task[]> = {};
+let mockReminders: Record<string, Reminder[]> = {};
 
 // Mock user interface
 interface MockUser {
@@ -140,8 +140,12 @@ export const trpc = {
           listeners.push(options.onSuccess);
         }
         
+        // Get current user ID from localStorage
+        const currentUser = localStorage.getItem('user');
+        const userId = currentUser ? JSON.parse(currentUser).id : 'anonymous';
+        
         return {
-          data: mockTasks, 
+          data: mockTasks[userId] || [], 
           isLoading: false,
           // Force refresh by including counter
           refreshCounter,
@@ -172,7 +176,13 @@ export const trpc = {
               completed: false,
               rolloverCount: 0
             };
-            mockTasks.push(newTask);
+            
+            // Get current user ID
+            const currentUser = localStorage.getItem('user');
+            const userId = currentUser ? JSON.parse(currentUser).id : 'anonymous';
+            
+            if (!mockTasks[userId]) mockTasks[userId] = [];
+            mockTasks[userId].push(newTask);
             triggerStateChange();
             
             // Call onSuccess callback
@@ -198,7 +208,13 @@ export const trpc = {
               completed: false,
               rolloverCount: 0
             };
-            mockTasks.push(newTask);
+            
+            // Get current user ID
+            const currentUser = localStorage.getItem('user');
+            const userId = currentUser ? JSON.parse(currentUser).id : 'anonymous';
+            
+            if (!mockTasks[userId]) mockTasks[userId] = [];
+            mockTasks[userId].push(newTask);
             triggerStateChange();
             
             isPending = false;
@@ -212,10 +228,17 @@ export const trpc = {
       useMutation: (_options?: any) => ({
         mutate: (data: any) => {
           console.log('Updating task:', data);
-          const taskIndex = mockTasks.findIndex(t => t.id === data.id);
-          if (taskIndex !== -1) {
-            mockTasks[taskIndex] = { ...mockTasks[taskIndex], ...data };
-            triggerStateChange();
+          
+          // Get current user ID
+          const currentUser = localStorage.getItem('user');
+          const userId = currentUser ? JSON.parse(currentUser).id : 'anonymous';
+          
+          if (mockTasks[userId]) {
+            const taskIndex = mockTasks[userId].findIndex(t => t.id === data.id);
+            if (taskIndex !== -1) {
+              mockTasks[userId][taskIndex] = { ...mockTasks[userId][taskIndex], ...data };
+              triggerStateChange();
+            }
           }
           return Promise.resolve();
         },
@@ -232,8 +255,15 @@ export const trpc = {
             isPending = true;
             
             console.log('Deleting task:', data);
-            mockTasks = mockTasks.filter(t => t.id !== data.id);
-            triggerStateChange();
+            
+            // Get current user ID
+            const currentUser = localStorage.getItem('user');
+            const userId = currentUser ? JSON.parse(currentUser).id : 'anonymous';
+            
+            if (mockTasks[userId]) {
+              mockTasks[userId] = mockTasks[userId].filter(t => t.id !== data.id);
+              triggerStateChange();
+            }
             
             // Call onSuccess callback
             if (options?.onSuccess) {
@@ -257,7 +287,12 @@ export const trpc = {
             isPending = true;
             
             console.log('Deleting all tasks');
-            mockTasks = [];
+            
+            // Get current user ID
+            const currentUser = localStorage.getItem('user');
+            const userId = currentUser ? JSON.parse(currentUser).id : 'anonymous';
+            
+            mockTasks[userId] = [];
             triggerStateChange();
             
             // Call onSuccess callback
@@ -276,7 +311,11 @@ export const trpc = {
     replaceAll: {
       useMutation: (_options?: any) => ({
         mutate: (data: { tasks: Task[] }) => {
-          mockTasks = Array.isArray(data.tasks) ? [...data.tasks] : [];
+          // Get current user ID
+          const currentUser = localStorage.getItem('user');
+          const userId = currentUser ? JSON.parse(currentUser).id : 'anonymous';
+          
+          mockTasks[userId] = Array.isArray(data.tasks) ? [...data.tasks] : [];
           triggerStateChange();
           return Promise.resolve();
         },
@@ -295,11 +334,17 @@ export const trpc = {
   },
   reminders: {
     list: {
-      useQuery: (_options?: any) => ({
-        data: mockReminders,
-        isLoading: false,
-        refetch: () => Promise.resolve()
-      })
+      useQuery: (_options?: any) => {
+        // Get current user ID
+        const currentUser = localStorage.getItem('user');
+        const userId = currentUser ? JSON.parse(currentUser).id : 'anonymous';
+        
+        return {
+          data: mockReminders[userId] || [],
+          isLoading: false,
+          refetch: () => Promise.resolve()
+        };
+      }
     },
     create: {
       useMutation: (_options?: any) => ({ 
@@ -329,8 +374,15 @@ export const trpc = {
             isPending = true;
             
             console.log('Deleting reminder:', data);
-            mockReminders = mockReminders.filter(r => r.id !== data.id);
-            triggerStateChange();
+            
+            // Get current user ID
+            const currentUser = localStorage.getItem('user');
+            const userId = currentUser ? JSON.parse(currentUser).id : 'anonymous';
+            
+            if (mockReminders[userId]) {
+              mockReminders[userId] = mockReminders[userId].filter(r => r.id !== data.id);
+              triggerStateChange();
+            }
             
             if (options?.onSuccess) {
               options.onSuccess();
@@ -347,7 +399,11 @@ export const trpc = {
     replaceAll: {
       useMutation: (_options?: any) => ({
         mutate: (data: { reminders: Reminder[] }) => {
-          mockReminders = Array.isArray(data.reminders) ? [...data.reminders] : [];
+          // Get current user ID
+          const currentUser = localStorage.getItem('user');
+          const userId = currentUser ? JSON.parse(currentUser).id : 'anonymous';
+          
+          mockReminders[userId] = Array.isArray(data.reminders) ? [...data.reminders] : [];
           triggerStateChange();
           return Promise.resolve();
         },

@@ -62,12 +62,14 @@ export function UserProfile({ onRefresh }: UserProfileProps) {
       return;
     }
     try {
-      // Gather current data from trpc mocks
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const tasks: any[] = (trpc as any).tasks.list.useQuery().data || [];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const reminders: any[] = (trpc as any).reminders.list.useQuery().data || [];
-      const payload = datasetToBase64({ tasks, reminders });
+      // Get current data from trpc queries
+      const { data: tasks } = trpc.tasks.list.useQuery();
+      const { data: reminders } = trpc.reminders.list.useQuery();
+      
+      const payload = datasetToBase64({ 
+        tasks: tasks || [], 
+        reminders: reminders || [] 
+      });
       const name = user?.email === 'phuonglh43@gmail.com' ? 'focus-matrix-system-backup.json' : 'focus-matrix-user-backup.json';
       const res = await createOrUpdateJsonFile(accessToken, driveFileId, name, payload);
       setDriveFileId(res.id);
