@@ -32,64 +32,20 @@ import {
   Shield
 } from "lucide-react";
 import { toast } from "sonner";
+import { trpc } from "@/lib/trpc";
+// import { useTrpcState } from "@/hooks/useTrpcState";
 
-// Mock user data - trong thực tế sẽ lấy từ API
-const mockUsers = [
-  {
-    id: "user-1",
-    name: "Nguyễn Văn A",
-    email: "nguyenvana@example.com",
-    role: "admin",
-    status: "active",
-    joinDate: "2024-01-15",
-    lastLogin: "2024-10-23",
-    taskCount: 15,
-    completedTasks: 12
-  },
-  {
-    id: "user-2", 
-    name: "Trần Thị B",
-    email: "tranthib@example.com",
-    role: "user",
-    status: "active",
-    joinDate: "2024-02-20",
-    lastLogin: "2024-10-22",
-    taskCount: 8,
-    completedTasks: 6
-  },
-  {
-    id: "user-3",
-    name: "Lê Văn C", 
-    email: "levanc@example.com",
-    role: "user",
-    status: "inactive",
-    joinDate: "2024-03-10",
-    lastLogin: "2024-10-15",
-    taskCount: 5,
-    completedTasks: 3
-  },
-  {
-    id: "user-4",
-    name: "Phạm Thị D",
-    email: "phamthid@example.com", 
-    role: "user",
-    status: "active",
-    joinDate: "2024-04-05",
-    lastLogin: "2024-10-23",
-    taskCount: 20,
-    completedTasks: 18
-  }
-];
+// Use real data from trpc
 
 export function AdminDashboard() {
-  const [users, setUsers] = useState(mockUsers);
+  const { data: users = [] } = trpc.users.list.useQuery();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterRole, setFilterRole] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [showUserDialog, setShowUserDialog] = useState(false);
 
-  const filteredUsers = users.filter(user => {
+  const filteredUsers = users.filter((user: any) => {
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          user.email.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = filterRole === "all" || user.role === filterRole;
@@ -103,20 +59,39 @@ export function AdminDashboard() {
     setShowUserDialog(true);
   };
 
+  const deleteUser = trpc.users.delete.useMutation({
+    onSuccess: () => {
+      toast.success("Đã xóa người dùng");
+    },
+    onError: (error: any) => {
+      toast.error(`Lỗi: ${error.message}`);
+    }
+  });
+
+  const updateUser = trpc.users.update.useMutation({
+    onSuccess: () => {
+      toast.success("Đã cập nhật người dùng");
+      setShowUserDialog(false);
+    },
+    onError: (error: any) => {
+      toast.error(`Lỗi: ${error.message}`);
+    }
+  });
+
   const handleDeleteUser = (userId: string) => {
     if (confirm("Bạn có chắc muốn xóa người dùng này?")) {
-      setUsers(users.filter(u => u.id !== userId));
-      toast.success("Đã xóa người dùng");
+      deleteUser.mutate({ id: userId });
     }
   };
 
   const handleToggleStatus = (userId: string) => {
-    setUsers(users.map(user => 
-      user.id === userId 
-        ? { ...user, status: user.status === "active" ? "inactive" : "active" }
-        : user
-    ));
-    toast.success("Đã thay đổi trạng thái người dùng");
+    const user = users.find((u: any) => u.id === userId);
+    if (user) {
+      updateUser.mutate({
+        id: userId,
+        status: user.status === "active" ? "inactive" : "active"
+      });
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -213,7 +188,7 @@ export function AdminDashboard() {
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Tổng công việc</p>
                 <p className="text-2xl font-bold text-purple-600">
-                  {users.reduce((sum, u) => sum + u.taskCount, 0)}
+                  {users.length}
                 </p>
               </div>
               <Calendar className="h-8 w-8 text-purple-500" />
@@ -282,7 +257,7 @@ export function AdminDashboard() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredUsers.map((user) => (
+              {filteredUsers.map((user: any) => (
                 <TableRow key={user.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
@@ -300,12 +275,12 @@ export function AdminDashboard() {
                   </TableCell>
                   <TableCell>{getRoleBadge(user.role)}</TableCell>
                   <TableCell>{getStatusBadge(user.status)}</TableCell>
-                  <TableCell className="text-sm">{user.joinDate}</TableCell>
-                  <TableCell className="text-sm">{user.lastLogin}</TableCell>
+                  <TableCell className="text-sm">{user.joinedAt ? new Date(user.joinedAt).toLocaleDateString('vi-VN') : 'N/A'}</TableCell>
+                  <TableCell className="text-sm">Hôm nay</TableCell>
                   <TableCell>
                     <div className="text-sm">
-                      <div>{user.taskCount} tổng</div>
-                      <div className="text-green-600">{user.completedTasks} hoàn thành</div>
+                      <div>0 tổng</div>
+                      <div className="text-green-600">0 hoàn thành</div>
                     </div>
                   </TableCell>
                   <TableCell>

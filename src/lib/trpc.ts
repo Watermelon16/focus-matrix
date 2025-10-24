@@ -440,5 +440,74 @@ export const trpc = {
         isPending: false 
       })
     }
+  },
+  // New mock for user management
+  users: {
+    list: {
+      useQuery: (options?: any) => {
+        // Add listener for state changes
+        if (options?.onSuccess) {
+          listeners.push(options.onSuccess);
+        }
+        return {
+          data: mockUsers,
+          isLoading: false,
+          refreshCounter,
+          refetch: () => {
+            notifyListeners();
+            return Promise.resolve();
+          }
+        };
+      }
+    },
+    update: {
+      useMutation: (options?: any) => {
+        let isPending = false;
+        return {
+          mutate: (data: { id: string; name?: string; email?: string; role?: 'user' | 'admin'; status?: 'active' | 'inactive' }) => {
+            if (isPending) return;
+            isPending = true;
+
+            console.log('Updating user:', data);
+            const userIndex = mockUsers.findIndex(u => u.id === data.id);
+            if (userIndex !== -1) {
+              mockUsers[userIndex] = { ...mockUsers[userIndex], ...data };
+              triggerStateChange();
+              if (options?.onSuccess) {
+                options.onSuccess();
+              }
+            } else {
+              if (options?.onError) {
+                options.onError(new Error('User not found'));
+              }
+            }
+            isPending = false;
+            return Promise.resolve();
+          },
+          isPending: isPending
+        };
+      }
+    },
+    delete: {
+      useMutation: (options?: any) => {
+        let isPending = false;
+        return {
+          mutate: (data: { id: string }) => {
+            if (isPending) return;
+            isPending = true;
+
+            console.log('Deleting user:', data);
+            mockUsers = mockUsers.filter(u => u.id !== data.id);
+            triggerStateChange();
+            if (options?.onSuccess) {
+              options.onSuccess();
+            }
+            isPending = false;
+            return Promise.resolve();
+          },
+          isPending: isPending
+        };
+      }
+    }
   }
 };

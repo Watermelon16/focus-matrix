@@ -10,6 +10,7 @@ import { EditReminderDialog } from "./EditReminderDialog";
 import { LoginDialog } from "./LoginDialog";
 import { AdminDashboard } from "./AdminDashboard";
 import { AddTaskDialog } from "./AddTaskDialog";
+import { CalendarSync } from "./CalendarSync";
 import { Loader2, LogOut, Trash2, BarChart3, Grid3X3, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { getNow } from "@/lib/date";
@@ -237,9 +238,10 @@ export default function Home() {
               <CardHeader>
                 <CardTitle className="text-base">Thêm công việc</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-3">
                 <AddTaskDialog onSuccess={forceRefresh} />
-                <p className="text-xs text-muted-foreground mt-2">
+                <CalendarSync onSuccess={forceRefresh} />
+                <p className="text-xs text-muted-foreground">
                   Tự động phân loại theo deadline và loại công việc
                 </p>
               </CardContent>
