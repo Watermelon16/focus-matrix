@@ -12,6 +12,7 @@ export interface Task {
   origin?: "manual" | "ics" | "gcal" | "apple";
   sourceEventId?: string;
   rolloverCount: number;
+  taskType?: string;   // work, personal, health, learning, family, other
 }
 
 export interface Reminder {

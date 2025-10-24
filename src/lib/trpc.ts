@@ -174,7 +174,8 @@ export const trpc = {
               dueDate: data.dueDate,
               priority: data.priority,
               completed: false,
-              rolloverCount: 0
+              rolloverCount: 0,
+              taskType: data.taskType || 'work'
             };
             
             // Get current user ID
@@ -183,6 +184,20 @@ export const trpc = {
             
             if (!mockTasks[userId]) mockTasks[userId] = [];
             mockTasks[userId].push(newTask);
+            
+            // Create reminder if provided
+            if (data.reminder && data.reminder.time) {
+              const newReminder: Reminder = {
+                id: `reminder-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                taskId: newTask.id,
+                reminderTime: data.reminder.time,
+                email: data.reminder.email
+              };
+              
+              if (!mockReminders[userId]) mockReminders[userId] = [];
+              mockReminders[userId].push(newReminder);
+            }
+            
             triggerStateChange();
             
             // Call onSuccess callback
@@ -206,7 +221,8 @@ export const trpc = {
               dueDate: data.dueDate,
               priority: data.priority,
               completed: false,
-              rolloverCount: 0
+              rolloverCount: 0,
+              taskType: data.taskType || 'work'
             };
             
             // Get current user ID
@@ -215,6 +231,20 @@ export const trpc = {
             
             if (!mockTasks[userId]) mockTasks[userId] = [];
             mockTasks[userId].push(newTask);
+            
+            // Create reminder if provided
+            if (data.reminder && data.reminder.time) {
+              const newReminder: Reminder = {
+                id: `reminder-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                taskId: newTask.id,
+                reminderTime: data.reminder.time,
+                email: data.reminder.email
+              };
+              
+              if (!mockReminders[userId]) mockReminders[userId] = [];
+              mockReminders[userId].push(newReminder);
+            }
+            
             triggerStateChange();
             
             isPending = false;

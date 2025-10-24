@@ -9,6 +9,7 @@ import { SmartDashboard } from "./SmartDashboard";
 import { EditReminderDialog } from "./EditReminderDialog";
 import { LoginDialog } from "./LoginDialog";
 import { AdminDashboard } from "./AdminDashboard";
+import { AddTaskDialog } from "./AddTaskDialog";
 import { Loader2, LogOut, Trash2, BarChart3, Grid3X3, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { getNow } from "@/lib/date";
@@ -228,6 +229,19 @@ export default function Home() {
                   <span className="text-sm text-muted-foreground">Chưa hoàn thành</span>
                   <Badge variant="outline">{incompleteTasks}</Badge>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Thêm công việc nhanh */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Thêm công việc</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <AddTaskDialog onSuccess={forceRefresh} />
+                <p className="text-xs text-muted-foreground mt-2">
+                  Tự động phân loại theo deadline và loại công việc
+                </p>
               </CardContent>
             </Card>
 
