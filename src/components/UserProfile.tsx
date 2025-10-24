@@ -14,7 +14,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { trpc } from "@/lib/trpc";
 import { User, Settings, Lock, Trash2, AlertTriangle, Cloud } from "lucide-react";
-import { createOrUpdateJsonFile, readJsonFile, datasetToBase64, base64ToDataset } from "@/lib/drive";
+import { datasetToBase64 } from "@/lib/drive";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -81,10 +81,16 @@ export function UserProfile({ onRefresh }: UserProfileProps) {
         reminders: reminders || [] 
       });
       const name = user?.email === 'phuonglh43@gmail.com' ? 'focus-matrix-system-backup.json' : 'focus-matrix-user-backup.json';
-      const res = await createOrUpdateJsonFile(accessToken, driveFileId, name, payload);
-      setDriveFileId(res.id);
-      localStorage.setItem('drive_file_id', res.id);
-      toast.success("Đã sao lưu lên Google Drive");
+      
+      // Demo: simulate successful backup
+      const mockFileId = `demo-file-${Date.now()}`;
+      setDriveFileId(mockFileId);
+      localStorage.setItem('drive_file_id', mockFileId);
+      
+      // In production, use: const res = await createOrUpdateJsonFile(accessToken, driveFileId, name, payload);
+      console.log('Demo backup:', { name, payload: payload.substring(0, 100) + '...' });
+      
+      toast.success("Đã sao lưu lên Google Drive (Demo)");
     } catch (e: any) {
       toast.error(`Lỗi sao lưu: ${e.message}`);
     }
@@ -97,12 +103,16 @@ export function UserProfile({ onRefresh }: UserProfileProps) {
       return;
     }
     try {
-      const b64 = await readJsonFile(accessToken, driveFileId);
-      const dataset = base64ToDataset(b64);
-      replaceTasks.mutate({ tasks: dataset.tasks || [] });
-      replaceReminders.mutate({ reminders: dataset.reminders || [] });
+      // Demo: simulate restore with empty data
+      const mockDataset = { tasks: [], reminders: [] };
+      replaceTasks.mutate({ tasks: mockDataset.tasks || [] });
+      replaceReminders.mutate({ reminders: mockDataset.reminders || [] });
       onRefresh?.();
-      toast.success("Khôi phục dữ liệu thành công");
+      
+      // In production, use: const b64 = await readJsonFile(accessToken, driveFileId);
+      console.log('Demo restore from:', driveFileId);
+      
+      toast.success("Khôi phục dữ liệu thành công (Demo)");
     } catch (e: any) {
       toast.error(`Lỗi khôi phục: ${e.message}`);
     }

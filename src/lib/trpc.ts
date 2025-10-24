@@ -119,6 +119,7 @@ export const trpc = {
                 joinedAt: new Date().toISOString(),
               };
               mockUsers.push(newUser);
+              triggerStateChange(); // Trigger refresh for admin dashboard
               console.log('Mock register success for:', newUser.email);
               if (options?.onSuccess) {
                 options.onSuccess(newUser);
